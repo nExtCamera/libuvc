@@ -605,6 +605,14 @@ uvc_error_t uvc_trigger_still(
     uvc_device_handle_t *devh,
     uvc_still_ctrl_t *still_ctrl);
 
+uvc_error_t uvc_get_stream_ctrl(
+    uvc_device_handle_t *devh,
+    uvc_stream_ctrl_t *ctrl,
+    uint8_t formatIndex,
+    uint8_t frameIndex,
+    uint32_t interval
+    );
+
 const uvc_format_desc_t *uvc_get_format_descs(uvc_device_handle_t* );
 
 uvc_error_t uvc_probe_stream_ctrl(

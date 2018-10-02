@@ -503,8 +503,6 @@ uvc_error_t uvc_get_stream_ctrl_format_size(
         ctrl->bInterfaceNumber = stream_if->bInterfaceNumber;
         UVC_DEBUG("claiming streaming interface %d", stream_if->bInterfaceNumber );
         uvc_claim_if(devh, ctrl->bInterfaceNumber);
-        /* get the max values */
-        uvc_query_stream_ctrl( devh, ctrl, 1, UVC_GET_MAX);
 
         if (frame->intervals) {
           for (interval = frame->intervals; *interval; ++interval) {
@@ -544,6 +542,50 @@ uvc_error_t uvc_get_stream_ctrl_format_size(
 
 found:
   return uvc_probe_stream_ctrl(devh, ctrl);
+}
+
+/** Get a streaming control block for some common parameters.
+ * @ingroup streaming
+ *
+ * @param[in] devh Device handle
+ * @param[in,out] ctrl Control block
+ * @param[in] formatIndex
+ * @param[in] frameIndex
+ * @param[in] interval Frame interval rate (in 100ns)
+ */
+uvc_error_t uvc_get_stream_ctrl(
+        uvc_device_handle_t *devh,
+        uvc_stream_ctrl_t *ctrl,
+        uint8_t formatIndex, uint8_t frameIndex, uint32_t interval) {
+  uvc_error_t err;
+  const uvc_format_desc_t *format_descs = uvc_get_format_descs(devh);
+
+  const uvc_format_desc_t *format;
+  DL_SEARCH_SCALAR(format_descs, format, bFormatIndex, formatIndex);
+
+  if (format) {
+    uvc_frame_desc_t *frame;
+    DL_SEARCH_SCALAR(format->frame_descs, frame, bFrameIndex, frameIndex);
+
+    if (frame) {
+      ctrl->bInterfaceNumber = format->parent->bInterfaceNumber;
+
+      UVC_DEBUG("claiming streaming interface %d", ctrl->bInterfaceNumber );
+      err = uvc_claim_if(devh, ctrl->bInterfaceNumber);
+      if (err != UVC_SUCCESS) {
+        UVC_DEBUG("failed to claim usb interface: error_code=%d", err);
+        return err;
+      }
+
+      ctrl->bmHint = (1 << 0); /* don't negotiate interval */
+      ctrl->bFormatIndex = format->bFormatIndex;
+      ctrl->bFrameIndex = frame->bFrameIndex;
+      ctrl->dwFrameInterval = interval;
+
+      return uvc_probe_stream_ctrl(devh, ctrl);
+    }
+  }
+  return UVC_ERROR_INVALID_MODE;
 }
 
 /** Get a negotiated still control block for some common parameters.
