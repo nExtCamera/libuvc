@@ -57,21 +57,21 @@ static const int REQ_TYPE_GET = 0xa1;
  * @ingroup ctrl
  */
 int uvc_get_ctrl_len(uvc_device_handle_t *devh, uint8_t unit, uint8_t ctrl) {
-  unsigned char buf[2];
+    unsigned char buf[2];
 
-  int ret = libusb_control_transfer(
-    devh->usb_devh,
-    REQ_TYPE_GET, UVC_GET_LEN,
-    ctrl << 8,
-    unit << 8 | devh->info->ctrl_if.bInterfaceNumber,		// XXX saki
-    buf,
-    2,
-    0 /* timeout */);
+    int ret = libusb_control_transfer(
+            devh->usb_devh,
+            REQ_TYPE_GET, UVC_GET_LEN,
+            ctrl << 8,
+            unit << 8 | devh->info->ctrl_if.bInterfaceNumber,        // XXX saki
+            buf,
+            2,
+            0 /* timeout */);
 
-  if (ret < 0)
-    return ret;
-  else
-    return (unsigned short)SW_TO_SHORT(buf);
+    if (ret < 0)
+        return ret;
+    else
+        return (unsigned short) SW_TO_SHORT(buf);
 }
 
 /**
@@ -87,15 +87,16 @@ int uvc_get_ctrl_len(uvc_device_handle_t *devh, uint8_t unit, uint8_t ctrl) {
  *   a uvc_error_t error describing the error encountered.
  * @ingroup ctrl
  */
-int uvc_get_ctrl(uvc_device_handle_t *devh, uint8_t unit, uint8_t ctrl, void *data, int len, enum uvc_req_code req_code) {
-  return libusb_control_transfer(
-    devh->usb_devh,
-    REQ_TYPE_GET, req_code,
-    ctrl << 8,
-    unit << 8 | devh->info->ctrl_if.bInterfaceNumber,		// XXX saki
-    data,
-    len,
-    0 /* timeout */);
+int
+uvc_get_ctrl(uvc_device_handle_t *devh, uint8_t unit, uint8_t ctrl, void *data, int len, enum uvc_req_code req_code) {
+    return libusb_control_transfer(
+            devh->usb_devh,
+            REQ_TYPE_GET, req_code,
+            ctrl << 8,
+            unit << 8 | devh->info->ctrl_if.bInterfaceNumber,        // XXX saki
+            data,
+            len,
+            0 /* timeout */);
 }
 
 /**
@@ -111,55 +112,95 @@ int uvc_get_ctrl(uvc_device_handle_t *devh, uint8_t unit, uint8_t ctrl, void *da
  * @ingroup ctrl
  */
 int uvc_set_ctrl(uvc_device_handle_t *devh, uint8_t unit, uint8_t ctrl, void *data, int len) {
-  return libusb_control_transfer(
-    devh->usb_devh,
-    REQ_TYPE_SET, UVC_SET_CUR,
-    ctrl << 8,
-    unit << 8 | devh->info->ctrl_if.bInterfaceNumber,		// XXX saki
-    data,
-    len,
-    0 /* timeout */);
+    return libusb_control_transfer(
+            devh->usb_devh,
+            REQ_TYPE_SET, UVC_SET_CUR,
+            ctrl << 8,
+            unit << 8 | devh->info->ctrl_if.bInterfaceNumber,        // XXX saki
+            data,
+            len,
+            0 /* timeout */);
 }
 
 /***** INTERFACE CONTROLS *****/
-uvc_error_t uvc_get_power_mode(uvc_device_handle_t *devh, enum uvc_device_power_mode *mode, enum uvc_req_code req_code) {
-  uint8_t mode_char;
-  uvc_error_t ret;
+uvc_error_t
+uvc_get_power_mode(uvc_device_handle_t *devh, enum uvc_device_power_mode *mode, enum uvc_req_code req_code) {
+    uint8_t mode_char;
+    uvc_error_t ret;
 
-  ret = libusb_control_transfer(
-    devh->usb_devh,
-    REQ_TYPE_GET, req_code,
-    UVC_VC_VIDEO_POWER_MODE_CONTROL << 8,
-    devh->info->ctrl_if.bInterfaceNumber,	// XXX saki
-    &mode_char,
-    sizeof(mode_char),
-    0);
+    ret = libusb_control_transfer(
+            devh->usb_devh,
+            REQ_TYPE_GET, req_code,
+            UVC_VC_VIDEO_POWER_MODE_CONTROL << 8,
+            devh->info->ctrl_if.bInterfaceNumber,    // XXX saki
+            &mode_char,
+            sizeof(mode_char),
+            0);
 
-  if (ret == 1) {
-    *mode = mode_char;
-    return UVC_SUCCESS;
-  } else {
-    return ret;
-  }
+    if (ret == 1) {
+        *mode = mode_char;
+        return UVC_SUCCESS;
+    } else {
+        return ret;
+    }
 }
 
 uvc_error_t uvc_set_power_mode(uvc_device_handle_t *devh, enum uvc_device_power_mode mode) {
-  uint8_t mode_char = mode;
-  uvc_error_t ret;
+    uint8_t mode_char = mode;
+    uvc_error_t ret;
 
-  ret = libusb_control_transfer(
-    devh->usb_devh,
-    REQ_TYPE_SET, UVC_SET_CUR,
-    UVC_VC_VIDEO_POWER_MODE_CONTROL << 8,
-    devh->info->ctrl_if.bInterfaceNumber,	// XXX saki
-    &mode_char,
-    sizeof(mode_char),
-    0);
+    ret = libusb_control_transfer(
+            devh->usb_devh,
+            REQ_TYPE_SET, UVC_SET_CUR,
+            UVC_VC_VIDEO_POWER_MODE_CONTROL << 8,
+            devh->info->ctrl_if.bInterfaceNumber,    // XXX saki
+            &mode_char,
+            sizeof(mode_char),
+            0);
 
-  if (ret == 1)
-    return UVC_SUCCESS;
-  else
-    return ret;
+    if (ret == 1)
+        return UVC_SUCCESS;
+    else
+        return ret;
 }
 
-/** @todo Request Error Code Control (UVC 1.5, 4.2.1.2) */
+uvc_error_t uvc_get_request_error_code(uvc_device_handle_t *devh, enum uvc_request_error_code *error_code) {
+    uint8_t buffer = 0;
+    uvc_error_t ret;
+
+    ret = (uvc_error_t) libusb_control_transfer(
+            devh->usb_devh,
+            REQ_TYPE_GET, UVC_GET_CUR,
+            UVC_VC_REQUEST_ERROR_CODE_CONTROL << 8,
+            devh->info->ctrl_if.bInterfaceNumber,
+            &buffer, sizeof(buffer), 0);
+
+    if (ret == 1) {
+        *error_code = (enum uvc_request_error_code) buffer;
+        return UVC_SUCCESS;
+    } else {
+        return ret;
+    }
+}
+
+uvc_error_t uvc_get_stream_error_code(uvc_stream_handle_t *strmh, enum uvc_stream_error_code *error_code) {
+    uint8_t buffer = 0;
+    uvc_error_t ret;
+
+
+    ret = (uvc_error_t) libusb_control_transfer(
+            strmh->devh->usb_devh,
+            REQ_TYPE_GET, UVC_GET_CUR,
+            UVC_VS_STREAM_ERROR_CODE_CONTROL << 8,
+            strmh->devh->info->ctrl_if.bInterfaceNumber,
+            &buffer,
+            sizeof(buffer),
+            0);
+
+    if (ret == 1) {
+        *error_code = (enum uvc_stream_error_code) buffer;
+        return UVC_SUCCESS;
+    } else {
+        return ret;
+    }
+}

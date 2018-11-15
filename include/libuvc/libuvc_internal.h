@@ -340,6 +340,8 @@ uvc_error_t uvc_release_if(uvc_device_handle_t *devh, int idx);
 
 void _uvc_swap_buffers(uvc_stream_handle_t *strmh);
 
+uvc_error_t uvc_get_request_error_code(uvc_device_handle_t *devh, enum uvc_request_error_code *error_code);
+uvc_error_t uvc_get_stream_error_code(uvc_stream_handle_t *strmh, enum uvc_stream_error_code *error_code);
 
 #endif // !def(LIBUVC_INTERNAL_H)
 /** @endcond */

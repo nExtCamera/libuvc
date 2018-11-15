@@ -874,7 +874,7 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
 #endif //NDEBUG
     }
     break;
-  case LIBUSB_TRANSFER_CANCELLED: 
+  case LIBUSB_TRANSFER_CANCELLED:
   case LIBUSB_TRANSFER_NO_DEVICE: {
     UVC_DEBUG("not retrying transfer, status = %s", libusb_error_name(transfer->status));
     resubmit = 0;
@@ -1390,7 +1390,7 @@ uvc_error_t uvc_stream_get_frame(uvc_stream_handle_t *strmh,
       pthread_mutex_unlock(&strmh->cb_mutex);
       return UVC_ERROR_OTHER;
   }
-  
+
   // wait indefinitely for buffer availability
   if (timeout_us == 0) {
       int err = 0;

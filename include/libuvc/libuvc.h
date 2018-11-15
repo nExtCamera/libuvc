@@ -53,6 +53,85 @@ typedef enum uvc_error {
   UVC_ERROR_OTHER = -99
 } uvc_error_t;
 
+/** Table 4-7 Request Error Code Control
+ * @ingroup diag
+ */
+typedef enum uvc_request_error_code {
+    UVC_REQUEST_NO_ERROR = 0x00,
+    UVC_REQUEST_NOT_READY = 0x01,
+    UVC_REQUEST_WRONG_STATE = 0x02,
+    UVC_REQUEST_POWER = 0x03,
+    UVC_REQUEST_OUT_OF_RANGE = 0x04,
+    UVC_REQUEST_INVALID_UNIT = 0x05,
+    UVC_REQUEST_INVALID_CONTROL = 0x06,
+    UVC_REQUEST_INVLID_REQUEST = 0x07,
+    UVC_REQUEST_INVALID_VALUE_IN_RANGE = 0x08,
+    UVC_REQUEST_UNKNOWN = 0xFF
+} uvc_request_error_code_t;
+
+/** Table 4-85 Stream Error Code Control
+ * @ingroup diag
+ */
+typedef enum uvc_stream_error_code {
+    UVC_STREAM_NO_ERROR = 0,
+
+    /**
+     * Protected content – This situation
+     * occurs if the data source device detects
+     * that the video or still-image data is
+     * protected and cannot be transmitted. In
+     * this case, empty packets containing only
+     * headers will be sent for the duration of
+     * the protected content.
+     */
+    UVC_STREAM_ERROR_PROTECTED_CONTENT = 1,
+
+    /**
+     * Input buffer underrun – If the data
+     * source device is not able to supply data at
+     * the requested rate, it will transmit empty
+     * packets containing only headers for the
+     * duration of the buffer underrun.
+     */
+    UVC_STREAM_ERROR_IN_BUFFER_UNDERRUN = 2,
+
+    /**
+     * Data discontinuity – Indicates a data
+     * discontinuity (arising from bad media,
+     * encoder errors, etc.) preceding the data
+     * payload in the current transfer.
+     */
+    UVC_STREAM_ERROR_DISCONTINUITY = 3,
+
+    /**
+     * Output buffer underrun – The data sink
+     * device is not being supplied with data at a
+     * sufficient rate.
+     */
+    UVC_STREAM_ERROR_OUT_BUFFER = 4,
+
+    /**
+     * Output buffer overrun – The data sink
+     * device is being supplied with data at a
+     * rate exceeding its buffering capabilities.
+     */
+    UVC_STREAM_ERROR_OUT_BUFFER_OVERRUN = 5,
+
+    /**
+     * Format change – A dynamic format
+     * change event occurred. See section
+     * 2.4.3.6, "Device Initiated Dynamic
+     * Format Change Support".
+     */
+    UVC_STREAM_ERROR_FORMAT_CHANGE = 6,
+
+    /**
+     * Still image capture error - An error
+     * occurred during still-image capture.
+     */
+    UVC_STREAM_ERROR_IMAGE_CAPTURE = 7
+} uvc_stream_error_code_t;
+
 /** Color coding of stream, transport-independent
  * @ingroup streaming
  */
@@ -404,10 +483,13 @@ enum uvc_status_class {
   UVC_STATUS_CLASS_CONTROL_PROCESSING = 0x12,
 };
 
+/** Table 2-2 Status Packet Format -> bAttribute */
 enum uvc_status_attribute {
   UVC_STATUS_ATTRIBUTE_VALUE_CHANGE = 0x00,
   UVC_STATUS_ATTRIBUTE_INFO_CHANGE = 0x01,
   UVC_STATUS_ATTRIBUTE_FAILURE_CHANGE = 0x02,
+  UVC_STATUS_ATTRIBUTE_MIN_VALUE_CHANGE  = 0x03,
+  UVC_STATUS_ATTRIBUTE_MAX_VALUE_CHANGE = 0x04,
   UVC_STATUS_ATTRIBUTE_UNKNOWN = 0xff
 };
 
