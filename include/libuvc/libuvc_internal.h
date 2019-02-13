@@ -231,8 +231,14 @@ typedef struct uvc_device_info {
 
 #define LIBUVC_XFER_META_BUF_SIZE (4 * 1024)
 
+enum uvc_fb_state {
+    UVC_FB_VALID,
+    UVC_FB_INVALID
+};
+
 struct uvc_framebuffer {
     struct uvc_framebuffer *prev, *next;
+    enum uvc_fb_state status;
     uint32_t seq;
     uint32_t pts;
     uint32_t scr;
@@ -275,7 +281,6 @@ struct uvc_stream_handle {
   struct uvc_framebuffer *frontbuffers;
   struct uvc_framebuffer *fb_front;
   struct uvc_frame frame;
-
 };
 
 /** Handle on an open UVC device

@@ -803,6 +803,7 @@ void _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t p
 
     if (header_info & UVC_STREAM_ERR) {
       UVC_DEBUG("bad packet: error bit set %zd", back_fb->got_bytes);
+      back_fb->status = UVC_FB_INVALID;
       return;
     }
 
@@ -880,6 +881,7 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
 
         if (pkt->status != 0) {
           UVC_DEBUG("bad packet (isochronous transfer); pkt_id=%d status: %s(%d), actual_length=%d", packet_id, libusb_error_name(pkt->status), pkt->status, pkt->actual_length);
+          strmh->backbuffers->status = UVC_FB_INVALID;
           continue;
         }
 
