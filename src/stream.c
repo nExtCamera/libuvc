@@ -784,6 +784,7 @@ void _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t p
 
     if (header_len > payload_len || header_len == 0) {
       UVC_DEBUG("bogus packet: actual_len=%zd, header_len=%zd\n", payload_len, header_len);
+        back_fb->status = UVC_FB_INVALID;
       return;
     }
 
