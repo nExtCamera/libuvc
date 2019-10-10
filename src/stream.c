@@ -823,6 +823,7 @@ void _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t p
          around from prior transfers. This means the camera didn't send
          an EOF for the last transfer of the previous frame. */
       _uvc_swap_buffers(strmh);
+      back_fb = strmh->backbuffers;
     }
 
     strmh->fid = (uint8_t) (header_info & UVC_STREAM_FID);
@@ -840,7 +841,7 @@ void _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t p
 
     if (header_len > variable_offset)
     {
-        // Metadata is attached to header
+      // Metadata is attached to header
       memcpy(back_fb->meta_buffer + back_fb->meta_got_bytes, payload + variable_offset, header_len - variable_offset);
       back_fb->meta_got_bytes += header_len - variable_offset;
     }
@@ -854,10 +855,10 @@ void _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t p
           back_fb->got_bytes += data_len;
       }
 
-    if (header_info & UVC_STREAM_EOF) {
-      /* The EOF bit is set, so publish the complete frame */
-      _uvc_swap_buffers(strmh);
-    }
+  }
+  if (header_info & UVC_STREAM_EOF) {
+    /* The EOF bit is set, so publish the complete frame */
+    _uvc_swap_buffers(strmh);
   }
 }
 
