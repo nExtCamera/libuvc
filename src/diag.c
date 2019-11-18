@@ -145,9 +145,6 @@ void uvc_print_diag(uvc_device_handle_t *devh, FILE *stream) {
     stream = stderr;
 
   if (devh->info->ctrl_if.bcdUVC) {
-    uvc_streaming_interface_t *stream_if;
-    int stream_idx = 0;
-
     uvc_device_descriptor_t *desc;
     uvc_get_device_descriptor(devh->dev, &desc);
 
@@ -163,6 +160,28 @@ void uvc_print_diag(uvc_device_handle_t *devh, FILE *stream) {
         "\tbcdUVC: 0x%04x\n",
         devh->info->ctrl_if.bcdUVC);
 
+    uvc_input_terminal_t *input_term_desc;
+    DL_FOREACH(devh->info->ctrl_if.input_term_descs, input_term_desc) {
+      fprintf(stream, "Input Terminal (%d):\n"
+                      "\twTerminalType: 0x%x\n"
+                      "\tbmControls: 0x%08lx\n",
+              input_term_desc->bTerminalID,
+              input_term_desc->wTerminalType,
+              input_term_desc->bmControls);
+    }
+
+    uvc_processing_unit_t *pu_desc;
+    DL_FOREACH(devh->info->ctrl_if.processing_unit_descs, pu_desc) {
+      fprintf(stream, "Processing Unit (%d):\n"
+                      "\tbSourceID: %d\n"
+                      "\tbmControls: 0x%08lx\n",
+              pu_desc->bUnitID,
+              pu_desc->bSourceID,
+              pu_desc->bmControls);
+    }
+
+    uvc_streaming_interface_t *stream_if;
+    int stream_idx = 0;
     DL_FOREACH(devh->info->stream_ifs, stream_if) {
       uvc_format_desc_t *fmt_desc;
 
