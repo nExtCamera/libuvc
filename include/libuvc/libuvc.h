@@ -437,14 +437,16 @@ typedef struct uvc_device_descriptor {
   uint16_t idVendor;
   /** Product ID */
   uint16_t idProduct;
-  /** UVC compliance level, e.g. 0x0100 (1.0), 0x0110 */
-  uint16_t bcdUVC;
+  /** USB version, e.g. 0x0200 (USB 2.0), 0x0110 (USB 1.1), etc. */
+  uint16_t bcdUSB;
   /** Serial number (null if unavailable) */
   const char *serialNumber;
   /** Device-reported manufacturer name (or null) */
   const char *manufacturer;
   /** Device-reporter product name (or null) */
   const char *product;
+  /** Number of possible configurations */
+  uint8_t  bNumConfigurations;
 } uvc_device_descriptor_t;
 
 /** An image frame received from the UVC device

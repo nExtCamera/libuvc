@@ -151,6 +151,8 @@ void uvc_print_diag(uvc_device_handle_t *devh, FILE *stream) {
     fprintf(stream, "DEVICE CONFIGURATION (%04x:%04x/%s) ---\n",
         desc->idVendor, desc->idProduct,
         desc->serialNumber ? desc->serialNumber : "[none]");
+    fprintf(stream, "bcdUSB: 0x%04x\n", desc->bcdUSB);
+    fprintf(stream, "bNumConfigurations: %d\n", desc->bNumConfigurations);
 
     uvc_free_device_descriptor(desc);
 

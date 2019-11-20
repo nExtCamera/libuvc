@@ -611,6 +611,8 @@ uvc_error_t uvc_get_device_descriptor(
   desc_internal = calloc(1, sizeof(*desc_internal));
   desc_internal->idVendor = usb_desc.idVendor;
   desc_internal->idProduct = usb_desc.idProduct;
+  desc_internal->bcdUSB = usb_desc.bcdUSB;
+  desc_internal->bNumConfigurations = usb_desc.bNumConfigurations;
 
   if (libusb_open(dev->usb_dev, &usb_devh) == 0) {
     unsigned char buf[64];
@@ -1282,7 +1284,7 @@ uvc_error_t uvc_scan_streaming(uvc_device_t *dev,
 			       int interface_idx) {
   const struct libusb_interface_descriptor *if_desc;
   const unsigned char *buffer;
-  size_t buffer_left, block_size;
+  int buffer_left, block_size;
   uvc_error_t ret, parse_ret;
   uvc_streaming_interface_t *stream_if;
 
@@ -1293,6 +1295,24 @@ uvc_error_t uvc_scan_streaming(uvc_device_t *dev,
   if_desc = &(info->config->interface[interface_idx].altsetting[0]);
   buffer = if_desc->extra;
   buffer_left = if_desc->extra_length;
+
+  /* The Pico iMage webcam has its class-specific interface descriptors
+   * after the endpoint descriptors.
+   */
+  if (buffer_left == 0) {
+    for (int i = 0; i < if_desc->bNumEndpoints; ++i) {
+      const struct libusb_endpoint_descriptor *ep = &if_desc->endpoint[i];
+
+      if (ep->extra_length == 0)
+        continue;
+
+      if (ep->extra_length > 2 && ep->extra[1] == 0x24) {
+        buffer = ep->extra;
+        buffer_left = ep->extra_length;
+        break;
+      }
+    }
+  }
 
   stream_if = calloc(1, sizeof(*stream_if));
   stream_if->parent = info;
