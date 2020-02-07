@@ -904,12 +904,12 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
     }
     break;
   case LIBUSB_TRANSFER_CANCELLED: 
-  case LIBUSB_TRANSFER_ERROR:
   case LIBUSB_TRANSFER_NO_DEVICE: {
     UVC_DEBUG("not retrying transfer, status = %s", libusb_error_name(transfer->status));
     resubmit = 0;
     break;
   }
+  case LIBUSB_TRANSFER_ERROR:
   case LIBUSB_TRANSFER_TIMED_OUT:
   case LIBUSB_TRANSFER_STALL:
   case LIBUSB_TRANSFER_OVERFLOW:
@@ -918,8 +918,12 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
   }
 
     if (resubmit && strmh->running) {
-        int libusbRet = libusb_submit_transfer(transfer);
-        if (libusbRet < 0) {
+        int libusbRet;
+        int retry = 1000;
+        do {
+          libusbRet = libusb_submit_transfer(transfer);
+        } while (libusbRet != LIBUSB_SUCCESS && --retry > 0);
+        if (libusbRet != LIBUSB_SUCCESS) {
             int i;
             pthread_mutex_lock(&strmh->cb_mutex);
 
