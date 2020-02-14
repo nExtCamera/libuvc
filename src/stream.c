@@ -924,6 +924,13 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
     break;
   }
   case LIBUSB_TRANSFER_ERROR:
+    if (strmh->running &&
+        transfer->type != LIBUSB_TRANSFER_TYPE_ISOCHRONOUS &&
+        transfer->actual_length <= strmh->cur_ctrl.dwMaxPayloadTransferSize) {
+        /* This is a bulk mode transfer, so it just has one payload transfer */
+        _uvc_process_payload(strmh, transfer->buffer, (size_t) transfer->actual_length);
+        break;
+    }
   case LIBUSB_TRANSFER_TIMED_OUT:
   case LIBUSB_TRANSFER_STALL:
   case LIBUSB_TRANSFER_OVERFLOW:
