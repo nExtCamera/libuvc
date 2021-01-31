@@ -190,13 +190,15 @@ uvc_error_t uvc_query_stream_ctrl(
     uvc_stream_ctrl_t *ctrl,
     uint8_t probe,
     enum uvc_req_code req) {
-  uint8_t buf[34];
+  uint8_t buf[48];
   size_t len;
   uvc_error_t err;
 
   memset(buf, 0, sizeof(buf));
 
-  if (devh->info->ctrl_if.bcdUVC >= 0x0110)
+  if (devh->info->ctrl_if.bcdUVC >= 0x0150)
+    len = 48;
+  else if (devh->info->ctrl_if.bcdUVC >= 0x0110)
     len = 34;
   else
     len = 26;
@@ -344,6 +346,7 @@ uvc_error_t uvc_trigger_still(
   uvc_streaming_interface_t* stream_if;
   uint8_t buf;
   uvc_error_t err;
+  UVC_ENTER();
 
   /* Stream must be running for method 2 to work */
   stream = _uvc_get_stream_by_interface(devh, still_ctrl->bInterfaceNumber);
@@ -625,6 +628,8 @@ uvc_error_t uvc_get_still_ctrl_format_size(
   uvc_format_desc_t *format;
   uvc_still_frame_res_t *sizePattern;
 
+  UVC_ENTER();
+
   stream_if = _uvc_get_stream_if(devh, ctrl->bInterfaceNumber);
 
   /* Only method 2 is supported */
@@ -700,6 +705,7 @@ uvc_error_t uvc_probe_stream_ctrl(
 uvc_error_t uvc_probe_still_ctrl(
     uvc_device_handle_t *devh,
     uvc_still_ctrl_t *still_ctrl) {
+  UVC_ENTER();
 
   int res = uvc_query_still_ctrl(
     devh, still_ctrl, 1, UVC_SET_CUR
@@ -732,7 +738,7 @@ void _uvc_swap_buffers(uvc_stream_handle_t *strmh) {
       current->meta_got_bytes = 0;
       return;
   }
-  (void)clock_gettime(CLOCK_MONOTONIC, &current->capture_time_finished);
+  (void)clock_gettime(CLOCK_BOOTTIME, &current->capture_time_finished);
 
   pthread_mutex_lock(&strmh->cb_mutex);
 
@@ -1074,7 +1080,7 @@ uvc_error_t uvc_stream_open_ctrl(uvc_device_handle_t *devh, uvc_stream_handle_t 
   }
   strmh->width = frame_desc->wWidth;
   strmh->height = frame_desc->wHeight;
-  strmh->maxVideoFrameBufferSize = frame_desc->dwMaxVideoFrameBufferSize;
+  strmh->maxVideoFrameBufferSize = ctrl->dwMaxVideoFrameSize;
 
   strmh->payload_ctx = strmh->videoHandler->init(strmh);
   if (strmh->payload_ctx == NULL) {
