@@ -192,7 +192,7 @@ uvc_error_t uvc_get_stream_error_code(uvc_stream_handle_t *strmh, enum uvc_strea
             strmh->devh->usb_devh,
             REQ_TYPE_GET, UVC_GET_CUR,
             UVC_VS_STREAM_ERROR_CODE_CONTROL << 8,
-            strmh->devh->info->ctrl_if.bInterfaceNumber,
+            strmh->cur_ctrl.bInterfaceNumber,
             &buffer,
             sizeof(buffer),
             0);

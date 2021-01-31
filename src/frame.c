@@ -41,10 +41,11 @@
 /** @internal */
 uvc_error_t uvc_ensure_frame_size(uvc_frame_t *frame, size_t need_bytes) {
   if (frame->library_owns_data) {
-    if (!frame->data || frame->data_bytes != need_bytes) {
-      frame->data_bytes = need_bytes;
+    if (!frame->data || frame->capacity < need_bytes) {
+      frame->capacity = need_bytes;
       frame->data = realloc(frame->data, frame->data_bytes);
     }
+    frame->data_bytes = need_bytes;
     if (!frame->data)
       return UVC_ERROR_NO_MEM;
     return UVC_SUCCESS;

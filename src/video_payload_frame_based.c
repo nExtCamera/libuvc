@@ -13,6 +13,15 @@ static uvc_error_t release(uvc_video_payload_context_t* pCtx) {
     return UVC_SUCCESS;
 }
 
+static void finalize_frame(uvc_stream_handle_t *strmh) {
+    struct uvc_framebuffer* back_fb = strmh->backbuffers;
+    uvc_frame_t* frame = back_fb->frame;
+    frame->frame_format = strmh->frame_format;
+    frame->width = strmh->width;
+    frame->height = strmh->height;
+    _uvc_swap_buffers(strmh);
+}
+
 static uvc_error_t process_payload_frame_based(uvc_stream_handle_t *strmh, uvc_video_payload_context_t *pctx, uint8_t *payload, size_t length) {
     size_t header_len;
     uint8_t header_info;
@@ -29,7 +38,7 @@ static uvc_error_t process_payload_frame_based(uvc_stream_handle_t *strmh, uvc_v
            an EOF for the last transfer of the previous frame. */
         if (back_fb) {
             back_fb->status = pctx->frame_status;
-            _uvc_swap_buffers(strmh);
+            finalize_frame(strmh);
         }
         pctx->frame_status = UVC_FRAME_VALID;
         back_fb = strmh->backbuffers;
@@ -65,6 +74,7 @@ static uvc_error_t process_payload_frame_based(uvc_stream_handle_t *strmh, uvc_v
 
     if (data_len > 0) {
         uvc_frame_t* frame = back_fb->frame;
+        frame->isStillImage = (header_info & UVC_STREAM_STI) != 0;
         if (frame->data_bytes + data_len > frame->capacity) {
             UVC_DEBUG("buffer overflow: %zd > %zd", frame->data_bytes + data_len, frame->capacity);
         } else {
@@ -75,7 +85,7 @@ static uvc_error_t process_payload_frame_based(uvc_stream_handle_t *strmh, uvc_v
     }
     if (header_info & UVC_STREAM_EOF) {
         /* The EOF bit is set, so publish the complete frame */
-        _uvc_swap_buffers(strmh);
+        finalize_frame(strmh);
     }
     return UVC_SUCCESS;
 }

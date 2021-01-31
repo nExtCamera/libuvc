@@ -247,7 +247,7 @@ typedef struct uvc_frame_desc {
   uint32_t dwMinBitRate;
   /** Bitrate of corresponding stream at maximal frame rate */
   uint32_t dwMaxBitRate;
-  /** Maximum number of bytes for a video frame */
+  /** (deprecated) Maximum number of bytes for a video frame */
   uint32_t dwMaxVideoFrameBufferSize;
   /** Default frame interval (in 100ns units) */
   uint32_t dwDefaultFrameInterval;
@@ -564,6 +564,8 @@ typedef struct uvc_frame {
   void *metadata;
   /** Size of metadata buffer */
   size_t metadata_bytes;
+  /** is a still image */
+  int isStillImage;
 } uvc_frame_t;
 
 /** A callback function to handle incoming assembled UVC frames
@@ -764,6 +766,9 @@ void uvc_stream_close(uvc_stream_handle_t *strmh);
 int uvc_get_ctrl_len(uvc_device_handle_t *devh, uint8_t unit, uint8_t ctrl);
 int uvc_get_ctrl(uvc_device_handle_t *devh, uint8_t unit, uint8_t ctrl, void *data, int len, enum uvc_req_code req_code);
 int uvc_set_ctrl(uvc_device_handle_t *devh, uint8_t unit, uint8_t ctrl, void *data, int len);
+
+uvc_error_t uvc_get_request_error_code(uvc_device_handle_t *devh, enum uvc_request_error_code *error_code);
+uvc_error_t uvc_get_stream_error_code(uvc_stream_handle_t *strmh, enum uvc_stream_error_code *error_code);
 
 uvc_error_t uvc_get_power_mode(uvc_device_handle_t *devh, enum uvc_device_power_mode *mode, enum uvc_req_code req_code);
 uvc_error_t uvc_set_power_mode(uvc_device_handle_t *devh, enum uvc_device_power_mode mode);
