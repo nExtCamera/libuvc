@@ -22,13 +22,13 @@
 /** Converts an int16 into an unaligned two-byte little-endian integer */
 #define SHORT_TO_SW(s, p) \
   (p)[0] = (s); \
-  (p)[1] = (s) >> 8;
+  (p)[1] = (s) >> 8
 /** Converts an int32 into an unaligned four-byte little-endian integer */
 #define INT_TO_DW(i, p) \
   (p)[0] = (i); \
   (p)[1] = (i) >> 8; \
   (p)[2] = (i) >> 16; \
-  (p)[3] = (i) >> 24;
+  (p)[3] = (i) >> 24
 
 /** Selects the nth item in a doubly linked list. n=-1 selects the last item. */
 #define DL_NTH(head, out, n) \
@@ -317,6 +317,8 @@ struct uvc_video_payload_handler {
   UT_hash_handle hh; /* makes this structure hashable */
 };
 
+typedef void(uvc_job_func_t)(void *user_ptr);
+
 /** Context within which we communicate with devices */
 struct uvc_context {
   /** Underlying context for USB communication */
@@ -329,6 +331,10 @@ struct uvc_context {
   int kill_handler_thread;
   /***/
   struct uvc_video_payload_handler* video_payload_handlers;
+
+  int jobs_count;
+  uvc_job_func_t* jobs[16];
+  void* job_ptrs[16];
 };
 
 uvc_error_t uvc_query_stream_ctrl(
@@ -345,6 +351,8 @@ void _uvc_swap_buffers(uvc_stream_handle_t *strmh);
 
 uvc_error_t uvc_get_request_error_code(uvc_device_handle_t *devh, enum uvc_request_error_code *error_code);
 uvc_error_t uvc_get_stream_error_code(uvc_stream_handle_t *strmh, enum uvc_stream_error_code *error_code);
+
+void uvc_enqueue_job(uvc_context_t *ctx, uvc_job_func_t* func, void *user_ptr);
 
 #endif // !def(LIBUVC_INTERNAL_H)
 /** @endcond */

@@ -125,11 +125,21 @@ static void _uvc_prefill_video_handlers(uvc_context_t *ctx) {
  * There's one of these per UVC context.
  * @todo We shouldn't run this if we don't own the USB context
  */
-void *_uvc_handle_events(void *arg) {
+static void *uvc_handle_events(void *arg) {
   uvc_context_t *ctx = (uvc_context_t *) arg;
+  uvc_error_t err;
   nice(-10);
-  while (!ctx->kill_handler_thread)
-    libusb_handle_events_completed(ctx->usb_ctx, &ctx->kill_handler_thread);
+  while (!ctx->kill_handler_thread) {
+    err = libusb_handle_events_completed(ctx->usb_ctx, &ctx->kill_handler_thread);
+    if (err != LIBUSB_SUCCESS) {
+        UVC_ERROR("Got some error in the loop: %s", libusb_error_name(err));
+    } else {
+        for (int i = 0; i < ctx->jobs_count; ++i) {
+            ctx->jobs[i](ctx->job_ptrs[i]);
+        }
+        ctx->jobs_count = 0;
+    }
+  }
   return NULL;
 }
 
@@ -203,7 +213,17 @@ void uvc_exit(uvc_context_t *ctx) {
 void uvc_start_handler_thread(uvc_context_t *ctx) {
   if (ctx->own_usb_ctx) {
     ctx->kill_handler_thread = 0;
-    pthread_create(&ctx->handler_thread, NULL, _uvc_handle_events, (void *) ctx);
+    pthread_create(&ctx->handler_thread, NULL, uvc_handle_events, (void *) ctx);
   }
 }
 
+void uvc_enqueue_job(uvc_context_t *ctx, uvc_job_func_t* func, void *user_ptr) {
+    int last = ctx->jobs_count;
+    if (last >= 16) {
+        UVC_DEBUG("Limit reached. No more JOBS accepted.");
+        return;
+    }
+    ctx->jobs[last] = func;
+    ctx->job_ptrs[last] = user_ptr;
+    ctx->jobs_count = last + 1;
+}

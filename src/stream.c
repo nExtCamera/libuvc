@@ -66,11 +66,16 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
     return 0;
 }
 #endif // _MSC_VER
-uvc_frame_desc_t *uvc_find_frame_desc_stream(uvc_stream_handle_t *strmh,
+
+static const int REQ_TYPE_SET = 0x21;
+static const int REQ_TYPE_GET = 0xa1;
+
+
+static uvc_frame_desc_t *uvc_find_frame_desc_stream(uvc_stream_handle_t *strmh,
     uint16_t format_id, uint16_t frame_id);
-uvc_frame_desc_t *uvc_find_frame_desc(uvc_device_handle_t *devh,
+static uvc_frame_desc_t *uvc_find_frame_desc(uvc_device_handle_t *devh,
     uint16_t format_id, uint16_t frame_id);
-void *_uvc_user_caller(void *arg);
+static void *uvc_user_caller(void *arg);
 
 static uvc_streaming_interface_t *_uvc_get_stream_if(uvc_device_handle_t *devh, int interface_idx);
 static uvc_stream_handle_t *_uvc_get_stream_by_interface(uvc_device_handle_t *devh, int interface_idx);
@@ -230,13 +235,23 @@ uvc_error_t uvc_query_stream_ctrl(
   /* do the transfer */
   err = libusb_control_transfer(
       devh->usb_devh,
-      req == UVC_SET_CUR ? 0x21 : 0xA1,
+      req == UVC_SET_CUR ? REQ_TYPE_SET : REQ_TYPE_GET,
       req,
       probe ? (UVC_VS_PROBE_CONTROL << 8) : (UVC_VS_COMMIT_CONTROL << 8),
       ctrl->bInterfaceNumber,
       buf, len, 0
   );
 
+  if (err == LIBUSB_ERROR_PIPE) {
+      uvc_request_error_code_t req_error_code;
+      err = uvc_get_request_error_code(devh, &req_error_code);
+      if (err != UVC_SUCCESS) {
+          UVC_ERROR("error querying video control: %s", uvc_strerror(err));
+      } else {
+          UVC_ERROR("got request error code: 0x%x", req_error_code);
+          err = UVC_ERROR_REQUEST_NO_ERROR | req_error_code;
+      }
+  }
   if (err <= 0) {
     return err;
   }
@@ -310,7 +325,7 @@ uvc_error_t uvc_query_still_ctrl(
   /* do the transfer */
   err = libusb_control_transfer(
       devh->usb_devh,
-      req == UVC_SET_CUR ? 0x21 : 0xA1,
+      req == UVC_SET_CUR ? REQ_TYPE_SET : REQ_TYPE_GET,
       req,
       probe ? (UVC_VS_STILL_PROBE_CONTROL << 8) : (UVC_VS_STILL_COMMIT_CONTROL << 8),
       still_ctrl->bInterfaceNumber,
@@ -364,7 +379,7 @@ uvc_error_t uvc_trigger_still(
   /* do the transfer */
   err = libusb_control_transfer(
       devh->usb_devh,
-      0x21, //type set
+      REQ_TYPE_SET, //type set
       UVC_SET_CUR,
       (UVC_VS_STILL_IMAGE_TRIGGER_CONTROL << 8),
       still_ctrl->bInterfaceNumber,
@@ -683,14 +698,18 @@ static int _uvc_stream_params_negotiated(
 uvc_error_t uvc_probe_stream_ctrl(
     uvc_device_handle_t *devh,
     uvc_stream_ctrl_t *ctrl) {
-  uvc_stream_ctrl_t required_ctrl = *ctrl;
 
-  uvc_query_stream_ctrl( devh, ctrl, 1, UVC_SET_CUR );
-  uvc_query_stream_ctrl( devh, ctrl, 1, UVC_GET_CUR );
+  uvc_error_t err;
+  err = uvc_query_stream_ctrl(devh, ctrl, 1, UVC_SET_CUR);
+  if (err != UVC_SUCCESS) {
+      UVC_ERROR("failed to probe control (SET_CUR): error_code=%d", err);
+      return err;
+  }
 
-  if(!_uvc_stream_params_negotiated(&required_ctrl, ctrl)) {
-    UVC_DEBUG("Unable to negotiate streaming format");
-    return UVC_ERROR_INVALID_MODE;
+  err = uvc_query_stream_ctrl(devh, ctrl, 1, UVC_GET_CUR);
+  if (err != UVC_SUCCESS) {
+      UVC_ERROR("failed to probe control (GET_CUR): error_code=%d", err);
+      return err;
   }
 
   return UVC_SUCCESS;
@@ -763,6 +782,19 @@ void _uvc_swap_buffers(uvc_stream_handle_t *strmh) {
   pthread_mutex_unlock(&strmh->cb_mutex);
 }
 
+
+static void stream_error_job(void *userptr) {
+    uvc_stream_handle_t *strmh = userptr;
+    uvc_stream_error_code_t errcode;
+    libusb_clear_halt(strmh->devh->usb_devh, strmh->cur_ctrl.bInterfaceNumber);
+    uvc_error_t err = uvc_get_stream_error_code(strmh, &errcode);
+    if (err != UVC_SUCCESS) {
+        UVC_ERROR("uvc_get_stream_error_code() failed: %s", uvc_strerror(err));
+    } else {
+        UVC_ERROR("uvc_get_stream_error_code() success: %d", errcode);
+    }
+}
+
 /** @internal
  * @brief Process a payload transfer
  * 
@@ -816,6 +848,7 @@ uvc_error_t _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, s
     if (header_info & UVC_STREAM_ERR) {
       UVC_DEBUG("bad packet: error bit set");
       pctx->frame_status = UVC_FRAME_INVALID;
+        uvc_enqueue_job(strmh->devh->dev->ctx, stream_error_job, strmh);
     }
   }
 
@@ -1260,7 +1293,7 @@ uvc_error_t uvc_stream_start(
    * with the contents of each frame.
    */
   if (cb) {
-    pthread_create(&strmh->cb_thread, NULL, _uvc_user_caller, (void*) strmh);
+    pthread_create(&strmh->cb_thread, NULL, uvc_user_caller, (void*) strmh);
   }
 
   for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS; ++transfer_id) {
@@ -1319,7 +1352,7 @@ uvc_error_t uvc_stream_start_iso(
  * @note There should be at most one of these per currently streaming device
  * @param arg Device handle
  */
-void *_uvc_user_caller(void *arg) {
+void *uvc_user_caller(void *arg) {
   uvc_stream_handle_t *strmh = (uvc_stream_handle_t *) arg;
   uvc_frame_t *frame = NULL;
     for (int i = 0; i < LIBUVC_NUM_FRAMEBUFFERS; ++i) {

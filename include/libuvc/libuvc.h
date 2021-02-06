@@ -49,6 +49,16 @@ typedef enum uvc_error {
   UVC_ERROR_INVALID_MODE = -51,
   /** Resource has a callback (can't use polling and async) */
   UVC_ERROR_CALLBACK_EXISTS = -52,
+
+  UVC_ERROR_REQUEST_NO_ERROR = -64,
+  UVC_ERROR_REQUEST_NOT_READY = -63,
+  UVC_ERROR_REQUEST_WRONG_STATE = -62,
+  UVC_ERROR_REQUEST_POWER = -61,
+  UVC_ERROR_REQUEST_OUT_OF_RANGE = -60,
+  UVC_ERROR_REQUEST_INVALID_UNIT = -59,
+  UVC_ERROR_REQUEST_INVALID_CONTROL = -58,
+  UVC_ERROR_REQUEST_INVALID_REQUEST = -57,
+  UVC_ERROR_REQUEST_INVALID_VALUE_IN_RANGE = -56,
   /** Undefined error */
   UVC_ERROR_OTHER = -99
 } uvc_error_t;
@@ -64,7 +74,7 @@ typedef enum uvc_request_error_code {
     UVC_REQUEST_OUT_OF_RANGE = 0x04,
     UVC_REQUEST_INVALID_UNIT = 0x05,
     UVC_REQUEST_INVALID_CONTROL = 0x06,
-    UVC_REQUEST_INVLID_REQUEST = 0x07,
+    UVC_REQUEST_INVALID_REQUEST = 0x07,
     UVC_REQUEST_INVALID_VALUE_IN_RANGE = 0x08,
     UVC_REQUEST_UNKNOWN = 0xFF
 } uvc_request_error_code_t;
@@ -297,6 +307,10 @@ typedef struct uvc_format_desc {
   uint8_t bmInterlaceFlags;
   uint8_t bCopyProtect;
   uint8_t bVariableSize;
+  /** VS_COLORFORMAT params */
+  uint8_t bColorPrimaries;
+  uint8_t bTransferCharacteristics;
+  uint8_t bMatrixCoefficients;
   /** Available frame specifications for this format */
   struct uvc_frame_desc *frame_descs;
   struct uvc_still_frame_desc *still_frame_desc;
@@ -693,6 +707,7 @@ const uvc_selector_unit_t *uvc_get_selector_units(uvc_device_handle_t *devh);
 const uvc_processing_unit_t *uvc_get_processing_units(uvc_device_handle_t *devh);
 const uvc_extension_unit_t *uvc_get_extension_units(uvc_device_handle_t *devh);
 const struct uvc_streaming_interface *uvc_get_streaming_interface(uvc_device_handle_t *devh);
+uint16_t uvc_get_device_uvc_version(uvc_device_handle_t *devh);
 
 uvc_error_t uvc_get_stream_ctrl_format_size(
     uvc_device_handle_t *devh,

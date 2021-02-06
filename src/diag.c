@@ -237,6 +237,15 @@ void uvc_print_diag(uvc_device_handle_t *devh, FILE *stream) {
                 fmt_desc->bmInterlaceFlags,
                 fmt_desc->bCopyProtect);
 
+            fprintf(stream,
+                "\t\t  VS_COLORFORMAT\n"
+                "\t\t  bColorPrimaries: %d\n"
+                "\t\t  bTransferCharacteristics: %d\n"
+                "\t\t  bMatrixCoefficients: %d\n",
+                fmt_desc->bColorPrimaries,
+                fmt_desc->bTransferCharacteristics,
+                fmt_desc->bMatrixCoefficients);
+
             DL_FOREACH(fmt_desc->frame_descs, frame_desc) {
               uint32_t *interval_ptr;
 

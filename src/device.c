@@ -380,13 +380,12 @@ static uvc_error_t uvc_open_internal(
                                    _uvc_status_callback,
                                    internal_devh,
                                    0);
-    ret = libusb_submit_transfer(internal_devh->status_xfer);
-    UVC_DEBUG("libusb_submit_transfer() = %d", ret);
+    int uret = libusb_submit_transfer(internal_devh->status_xfer);
+    UVC_DEBUG("libusb_submit_transfer() = %d", uret);
 
-    if (ret) {
-      fprintf(stderr,
-              "uvc: device has a status interrupt endpoint, but unable to read from it\n");
-      goto fail;
+    if (uret) {
+      // TODO handle error in status interrupt endpoint, if required
+        UVC_ERROR("uvc: device has a status interrupt endpoint, but unable to read from it");
     }
   }
 
@@ -938,6 +937,10 @@ const uvc_streaming_interface_t *uvc_get_streaming_interface(uvc_device_handle_t
   return devh->info->stream_ifs;
 }
 
+uint16_t uvc_get_device_uvc_version(uvc_device_handle_t *devh) {
+    return devh->info->ctrl_if.bcdUVC;
+}
+
 /**
  * @brief Increment the reference count for a device
  * @ingroup device
@@ -1096,20 +1099,7 @@ uvc_error_t uvc_parse_vc_header(uvc_device_t *dev,
   */
 
   info->ctrl_if.bcdUVC = SW_TO_SHORT(&block[3]);
-
-  switch (info->ctrl_if.bcdUVC) {
-  case 0x0100:
-    info->ctrl_if.dwClockFrequency = DW_TO_INT(block + 7);
-    break;
-  case 0x010a:
-    info->ctrl_if.dwClockFrequency = DW_TO_INT(block + 7);
-    break;
-  case 0x0110:
-    break;
-  default:
-    UVC_EXIT(UVC_ERROR_NOT_SUPPORTED);
-    return UVC_ERROR_NOT_SUPPORTED;
-  }
+  info->ctrl_if.dwClockFrequency = DW_TO_INT(block + 7);
 
   for (i = 12; i < block_size; ++i) {
     scan_ret = uvc_scan_streaming(dev, info, block[i]);
@@ -1617,6 +1607,29 @@ uvc_error_t uvc_parse_vs_still_image_frame(uvc_streaming_interface_t *stream_if,
 }
 
 /** @internal
+ * @brief Parse a VideoStreaming Color Format Descriptor
+ * @ingroup device
+ */
+uvc_error_t uvc_parse_vs_colorformat(uvc_streaming_interface_t *stream_if,
+                                           const unsigned char *block,
+                                           size_t block_size) {
+
+    UVC_ENTER();
+    uvc_format_desc_t *format = stream_if->format_descs->prev;
+    if (format == NULL) {
+        UVC_EXIT(UVC_ERROR_NOT_FOUND);
+        return UVC_ERROR_NOT_FOUND;
+    }
+
+    format->bColorPrimaries = block[3];
+    format->bTransferCharacteristics = block[4];
+    format->bMatrixCoefficients = block[5];
+
+    UVC_EXIT(UVC_SUCCESS);
+    return UVC_SUCCESS;
+}
+
+/** @internal
  * Process a single VideoStreaming descriptor block
  * @ingroup device
  */
@@ -1660,7 +1673,7 @@ uvc_error_t uvc_parse_vs(
     UVC_DEBUG("unsupported descriptor subtype VS_FORMAT_DV");
     break;
   case UVC_VS_COLORFORMAT:
-    UVC_DEBUG("unsupported descriptor subtype VS_COLORFORMAT");
+      ret = uvc_parse_vs_colorformat(stream_if, block, block_size);
     break;
   case UVC_VS_FORMAT_FRAME_BASED:
     ret = uvc_parse_vs_frame_format ( stream_if, block, block_size );
