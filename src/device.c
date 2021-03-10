@@ -1506,6 +1506,11 @@ uvc_error_t uvc_parse_vs_frame_uncompressed(uvc_streaming_interface_t *stream_if
 
   UVC_ENTER();
 
+  if (stream_if->format_descs == NULL) {
+      UVC_EXIT(UVC_ERROR_NOT_FOUND);
+      return UVC_ERROR_NOT_FOUND;
+  }
+
   format = stream_if->format_descs->prev;
   frame = calloc(1, sizeof(*frame));
 
@@ -1876,7 +1881,7 @@ void uvc_process_streaming_status(uvc_device_handle_t *devh, unsigned char *data
                       devh->button_user_ptr);
     }
   } else {
-    UVC_DEBUG("Stream %u error event %02x %02x len %d.\n", data[1], data[2], data[3], len);
+    UVC_DEBUG("Stream %u error event code=%02x\n", data[1], data[2]);
   }
 
   UVC_EXIT_VOID();

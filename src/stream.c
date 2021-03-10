@@ -222,7 +222,7 @@ uvc_error_t uvc_query_stream_ctrl(
     INT_TO_DW(ctrl->dwMaxVideoFrameSize, buf + 18);
     INT_TO_DW(ctrl->dwMaxPayloadTransferSize, buf + 22);
 
-    if (len == 34) {
+    if (len >= 34) {
       INT_TO_DW ( ctrl->dwClockFrequency, buf + 26 );
       buf[30] = ctrl->bmFramingInfo;
       buf[31] = ctrl->bPreferredVersion;
@@ -270,7 +270,7 @@ uvc_error_t uvc_query_stream_ctrl(
     ctrl->dwMaxVideoFrameSize = DW_TO_INT(buf + 18);
     ctrl->dwMaxPayloadTransferSize = DW_TO_INT(buf + 22);
 
-    if (len == 34) {
+    if (len >= 34) {
       ctrl->dwClockFrequency = DW_TO_INT ( buf + 26 );
       ctrl->bmFramingInfo = buf[30];
       ctrl->bPreferredVersion = buf[31];
@@ -278,8 +278,9 @@ uvc_error_t uvc_query_stream_ctrl(
       ctrl->bMaxVersion = buf[33];
       /** @todo support UVC 1.1 */
     }
-    else
+    else {
       ctrl->dwClockFrequency = devh->info->ctrl_if.dwClockFrequency;
+    }
 
     /* fix up block for cameras that fail to set dwMax* */
     if (ctrl->dwMaxVideoFrameSize == 0) {
@@ -786,7 +787,8 @@ void _uvc_swap_buffers(uvc_stream_handle_t *strmh) {
 static void stream_error_job(void *userptr) {
     uvc_stream_handle_t *strmh = userptr;
     uvc_stream_error_code_t errcode;
-    libusb_clear_halt(strmh->devh->usb_devh, strmh->cur_ctrl.bInterfaceNumber);
+    if (!strmh->running) return;
+    libusb_clear_halt(strmh->devh->usb_devh, strmh->stream_if->bEndpointAddress);
     uvc_error_t err = uvc_get_stream_error_code(strmh, &errcode);
     if (err != UVC_SUCCESS) {
         UVC_ERROR("uvc_get_stream_error_code() failed: %s", uvc_strerror(err));
@@ -846,9 +848,9 @@ uvc_error_t _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, s
   if (header_len > 1) {
     header_info = payload[1];
     if (header_info & UVC_STREAM_ERR) {
-      UVC_DEBUG("bad packet: error bit set");
+      UVC_DEBUG("bad packet: error bit set, size=%d", payload_len);
       pctx->frame_status = UVC_FRAME_INVALID;
-        uvc_enqueue_job(strmh->devh->dev->ctx, stream_error_job, strmh);
+      //uvc_enqueue_job(strmh->devh->dev->ctx, stream_error_job, strmh);
     }
   }
 
