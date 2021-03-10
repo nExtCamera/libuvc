@@ -1538,8 +1538,21 @@ uvc_error_t uvc_stream_stop(uvc_stream_handle_t *strmh) {
  */
 void uvc_stream_close(uvc_stream_handle_t *strmh) {
   UVC_ENTER();
-  if (strmh->running)
+  if (strmh->running) {
     uvc_stream_stop(strmh);
+  }
+
+  uint8_t interface_id = strmh->stream_if->bInterfaceNumber;
+  const struct libusb_interface* interface = &strmh->devh->info->config->interface[interface_id];
+
+  /* A VS interface uses isochronous transfers iff it has multiple altsettings.
+   * (UVC 1.5: 2.4.3. VideoStreaming Interface) */
+  int isochronous = interface->num_altsetting > 1;
+  if (isochronous) {
+      libusb_set_interface_alt_setting(strmh->devh->usb_devh, interface_id, 0);
+  } else {
+      libusb_clear_halt(strmh->devh->usb_devh, strmh->stream_if->bEndpointAddress);
+  }
 
   uvc_release_if(strmh->devh, strmh->stream_if->bInterfaceNumber);
 
