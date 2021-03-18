@@ -7,6 +7,9 @@ static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
 
+const int TEX_WIDTH = 640;
+const int TEX_HEIGHT = 480;
+
 static void setupSDL()
 {
     SDL_Init(SDL_INIT_VIDEO);
@@ -15,14 +18,14 @@ static void setupSDL()
         "SDL2Test",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
-        640,
-        480,
+        TEX_WIDTH,
+        TEX_HEIGHT,
         SDL_WINDOW_SHOWN);
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     SDL_SetRenderDrawColor(renderer, 255, 0, 0, SDL_ALPHA_OPAQUE);
 
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, 640, 480);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, TEX_WIDTH, TEX_HEIGHT);
 }
 static void cleanupSDL()
 {
@@ -97,7 +100,7 @@ int main()
     }
     uvc_print_diag(devh, stderr);
 
-    uvc_stream_ctrl_t ctrl;
+    uvc_stream_ctrl_t ctrl = {0,};
     ret = uvc_get_stream_ctrl_format_size(
         devh, &ctrl, UVC_FRAME_FORMAT_MJPEG, 640, 480, 30);
     if (UVC_SUCCESS != ret) {
@@ -106,11 +109,33 @@ int main()
     }
     uvc_print_stream_ctrl(&ctrl, stderr);
 
-    ret = uvc_start_streaming(devh, &ctrl, cb, 0, 0);
+    uvc_stream_handle_t *strmh;
+    ret = uvc_stream_open_ctrl(devh, &strmh, &ctrl);
     if (UVC_SUCCESS != ret) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "uvc_start_streaming err %s", uvc_strerror(ret));
         return ret;
     }
+
+    // setup frames
+    size_t maxBufferSize = uvc_stream_get_max_buffer_size(strmh);
+    uvc_enqueue_frame(strmh, uvc_allocate_frame(maxBufferSize));
+    uvc_enqueue_frame(strmh, uvc_allocate_frame(maxBufferSize));
+
+    ret = uvc_stream_start(strmh, cb, 0, 0);
+    if (UVC_SUCCESS != ret) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "uvc_start_streaming err %s", uvc_strerror(ret));
+        return ret;
+    }
+
+    uvc_request_error_code_t rErrorCode;
+    uvc_stream_error_code_t errorCode;
+//    ret = uvc_get_stream_error_code(strmh, &errorCode);
+    if (UVC_SUCCESS != ret) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "uvc_get_stream_error_code err %s", uvc_strerror(ret));
+        return ret;
+    }
+//    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "uvc_get_stream_error_code errCode %d", errorCode);
+    
     eventLoop();
 
     uvc_stop_streaming(devh);
@@ -148,7 +173,8 @@ void cb(uvc_frame_t *frame, void *ptr)
 
     int pitch;
     if (!SDL_LockTexture(texture, nullptr, &rgb.data, &pitch)) {
-        rgb.data_bytes = pitch * 480;
+        rgb.capacity = pitch * TEX_HEIGHT;
+        rgb.data_bytes = pitch * TEX_HEIGHT;
         auto ret = uvc_any2rgb(frame, &rgb);
         if (ret)
         {
