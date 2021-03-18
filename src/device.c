@@ -1261,6 +1261,8 @@ uvc_error_t uvc_parse_vc(
   case UVC_VC_EXTENSION_UNIT:
     ret = uvc_parse_vc_extension_unit(dev, info, block, block_size);
     break;
+  case UVC_VC_ENCODING_UNIT:
+    break;
   default:
     ret = UVC_ERROR_INVALID_DEVICE;
   }

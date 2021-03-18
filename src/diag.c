@@ -229,8 +229,8 @@ void uvc_print_diag(uvc_device_handle_t *devh, FILE *stream) {
             fprintf(stream,
                 "\t\t  default frame: %d\n"
                 "\t\t  aspect ratio: %dx%d\n"
-                "\t\t  interlace flags: %02x\n"
-                "\t\t  copy protect: %02x\n",
+                "\t\t  interlace flags: 0x%02x\n"
+                "\t\t  copy protect: 0x%02x\n",
                 fmt_desc->bDefaultFrameIndex,
                 fmt_desc->bAspectRatioX,
                 fmt_desc->bAspectRatioY,
