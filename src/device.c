@@ -384,8 +384,12 @@ static uvc_error_t uvc_open_internal(
     UVC_DEBUG("libusb_submit_transfer() = %d", uret);
 
     if (uret) {
-      // TODO handle error in status interrupt endpoint, if required
         UVC_ERROR("uvc: device has a status interrupt endpoint, but unable to read from it");
+        libusb_free_transfer(internal_devh->status_xfer);
+        internal_devh->status_xfer = NULL;
+    } else {
+        pthread_mutex_init(&internal_devh->status_clean_mutex, NULL);
+        pthread_cond_init(&internal_devh->status_clean_condition, NULL);
     }
   }
 
@@ -1711,8 +1715,16 @@ void uvc_free_devh(uvc_device_handle_t *devh) {
   if (devh->info)
     uvc_free_device_info(devh->info);
 
-  if (devh->status_xfer)
-    libusb_free_transfer(devh->status_xfer);
+  if (devh->status_xfer) {
+      pthread_mutex_lock(&devh->status_clean_mutex);
+      if (devh->status_xfer) {
+          libusb_cancel_transfer(devh->status_xfer);
+          pthread_cond_wait(&devh->status_clean_condition, &devh->status_clean_mutex);
+      }
+      pthread_mutex_unlock(&devh->status_clean_mutex);
+      pthread_cond_destroy(&devh->status_clean_condition);
+      pthread_mutex_destroy(&devh->status_clean_mutex);
+  }
 
   free(devh);
 
@@ -1922,6 +1934,11 @@ void LIBUSB_CALL _uvc_status_callback(struct libusb_transfer *transfer) {
   case LIBUSB_TRANSFER_CANCELLED:
   case LIBUSB_TRANSFER_NO_DEVICE:
     UVC_DEBUG("not processing/resubmitting, status = %d", transfer->status);
+    pthread_mutex_lock(&devh->status_clean_mutex);
+    libusb_free_transfer(transfer);
+    devh->status_xfer = NULL;
+    pthread_cond_signal(&devh->status_clean_condition);
+    pthread_mutex_unlock(&devh->status_clean_mutex);
     UVC_EXIT_VOID();
     return;
   case LIBUSB_TRANSFER_COMPLETED:

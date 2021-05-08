@@ -307,6 +307,8 @@ struct uvc_device_handle {
   uvc_button_callback_t *button_cb;
   void *button_user_ptr;
 
+  pthread_mutex_t status_clean_mutex;
+  pthread_cond_t  status_clean_condition;
   uvc_stream_handle_t *streams;
   /** Whether the camera is an iSight that sends one header per frame */
   uint8_t is_isight;

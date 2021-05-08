@@ -183,6 +183,27 @@ static enum uvc_frame_format uvc_frame_format_for_guid(uint8_t guid[16]) {
   return UVC_FRAME_FORMAT_UNKNOWN;
 }
 
+static uvc_error_t uvc_hackfix_video_ctrl(uvc_device_handle_t *devh, uvc_stream_ctrl_t *ctrl) {
+    if (ctrl->dwMaxVideoFrameSize == 0) {
+        uvc_frame_desc_t *frame = uvc_find_frame_desc(devh, ctrl->bFormatIndex, ctrl->bFrameIndex);
+
+        if (frame) {
+            ctrl->dwMaxVideoFrameSize = frame->dwMaxVideoFrameBufferSize;
+        } else {
+            return UVC_ERROR_INVALID_MODE;
+        }
+    }
+
+    // do not support devices that provide wrong values
+    if ((ctrl->dwMaxPayloadTransferSize & 0xffff0000) == 0xffff0000)
+        return UVC_ERROR_NOT_SUPPORTED;
+
+    if (ctrl->dwMaxPayloadTransferSize == 0) {
+        ctrl->dwMaxPayloadTransferSize = 1024;
+    }
+    return UVC_SUCCESS;
+}
+
 /** @internal
  * Run a streaming control query
  * @param[in] devh UVC device
@@ -283,13 +304,8 @@ uvc_error_t uvc_query_stream_ctrl(
     }
 
     /* fix up block for cameras that fail to set dwMax* */
-    if (ctrl->dwMaxVideoFrameSize == 0) {
-      uvc_frame_desc_t *frame = uvc_find_frame_desc(devh, ctrl->bFormatIndex, ctrl->bFrameIndex);
-
-      if (frame) {
-        ctrl->dwMaxVideoFrameSize = frame->dwMaxVideoFrameBufferSize;
-      }
-    }
+    err = uvc_hackfix_video_ctrl(devh, ctrl);
+    if (err != UVC_SUCCESS) return err;
   }
 
   return UVC_SUCCESS;
