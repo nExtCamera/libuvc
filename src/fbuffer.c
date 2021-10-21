@@ -6,6 +6,9 @@ uvc_error_t uvc_enqueue_frame(uvc_stream_handle_t *strmh, uvc_frame_t *frame) {
     if (frame->frame_format != UVC_FRAME_FORMAT_ANY && frame->frame_format != strmh->frame_format) {
         return UVC_ERROR_INVALID_PARAM;
     }
+    if (frame == NULL) {
+        return UVC_ERROR_INVALID_PARAM;
+    }
     struct uvc_framebuffer *fb = calloc(1, sizeof(struct uvc_framebuffer));
     frame->data_bytes = 0;
     frame->frame_format = strmh->frame_format;

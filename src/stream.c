@@ -864,7 +864,7 @@ uvc_error_t _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, s
   if (header_len > 1) {
     header_info = payload[1];
     if (header_info & UVC_STREAM_ERR) {
-      UVC_DEBUG("bad packet: error bit set, size=%d", payload_len);
+      UVC_DEBUG("bad packet: error bit set, size=%zd", payload_len);
       pctx->frame_status = UVC_FRAME_INVALID;
       //uvc_enqueue_job(strmh->devh->dev->ctx, stream_error_job, strmh);
     }
@@ -1284,24 +1284,40 @@ uvc_error_t uvc_stream_start(
   /* Set up the transfers */
   for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS; ++transfer_id) {
       transfer = libusb_alloc_transfer(packets_per_transfer);
-      strmh->transfers[transfer_id] = transfer;
+      if (transfer == NULL) break;
       uint8_t *buffer = malloc(total_transfer_size);
+      if (buffer == NULL) {
+          libusb_free_transfer(transfer);
+          break;
+      }
       libusb_fill_iso_transfer(
         transfer, strmh->devh->usb_devh, strmh->stream_if->bEndpointAddress,
         buffer, total_transfer_size, packets_per_transfer, _uvc_stream_callback, (void*) strmh, 5000);
 
       libusb_set_iso_packet_lengths(transfer, endpoint_bytes_per_packet);
+      strmh->transfers[transfer_id] = transfer;
     }
   } else { // bulk transfer
     for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS; ++transfer_id) {
       transfer = libusb_alloc_transfer(0);
-      strmh->transfers[transfer_id] = transfer;
+      if (transfer == NULL) break;
       uint8_t *buffer = malloc(strmh->cur_ctrl.dwMaxPayloadTransferSize);
+      if (buffer == NULL) {
+          libusb_free_transfer(transfer);
+          break;
+      }
       libusb_fill_bulk_transfer( transfer, strmh->devh->usb_devh,
           strmh->stream_if->bEndpointAddress,
           buffer, strmh->cur_ctrl.dwMaxPayloadTransferSize, _uvc_stream_callback,
           ( void* ) strmh, 5000 );
+      strmh->transfers[transfer_id] = transfer;
     }
+  }
+  const int transfer_count = transfer_id;
+
+  if (transfer_count == 0) {
+      ret = UVC_ERROR_NO_MEM;
+      goto fail;
   }
 
   strmh->user_cb = cb;
@@ -1314,7 +1330,7 @@ uvc_error_t uvc_stream_start(
     pthread_create(&strmh->cb_thread, NULL, uvc_user_caller, (void*) strmh);
   }
 
-  for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS; ++transfer_id) {
+  for (transfer_id = 0; transfer_id < transfer_count; ++transfer_id) {
     ret = libusb_submit_transfer(strmh->transfers[transfer_id]);
     if (ret != LIBUSB_SUCCESS) {
       UVC_ERROR("libusb_submit_transfer (%d) failed: %d", transfer_id, ret);
@@ -1327,7 +1343,7 @@ uvc_error_t uvc_stream_start(
   }
 
   // clear all other transfers
-  for (int i = transfer_id ; i < LIBUVC_NUM_TRANSFER_BUFS; ++i) {
+  for (int i = transfer_id ; i < transfer_count; ++i) {
     free_transfer(strmh->transfers[i]);
     strmh->transfers[i] = NULL;
   }
@@ -1428,7 +1444,7 @@ struct timespec _get_abs_timeout(int32_t timeout_us) {
 /** Poll for a frame
  * @ingroup streaming
  *
- * @param devh UVC device
+ * @param strmh An opened and started UVC stream
  * @param[in|out] frame Location to store pointer to captured frame
  * @param timeout_us >0: Wait at most N microseconds; 0: Wait indefinitely; -1: return immediately
  */
@@ -1449,15 +1465,14 @@ uvc_error_t uvc_stream_get_frame(uvc_stream_handle_t *strmh,
   }
 
   // wait indefinitely for buffer availability
-  if (timeout_us == 0) {
-      int err = 0;
+    int err = 0;
+    if (timeout_us == 0) {
       while (strmh->frontbuffers == NULL
              && strmh->running
              && err == 0) {
           err = pthread_cond_wait(&strmh->cb_cond, &strmh->cb_mutex);
       }
   } else if (timeout_us > 0) {
-      int err = 0;
       ts = _get_abs_timeout(timeout_us);
       while (strmh->frontbuffers == NULL
              && strmh->running
@@ -1467,7 +1482,7 @@ uvc_error_t uvc_stream_get_frame(uvc_stream_handle_t *strmh,
   }
 
   struct uvc_framebuffer *fb = strmh->frontbuffers;
-  if (fb) {
+  if (fb && err == 0) {
       DL_DELETE(strmh->frontbuffers, fb);
       uvc_frame_t* next_frame = *frame;
       *frame = fb->frame;
