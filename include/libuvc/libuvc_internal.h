@@ -53,17 +53,20 @@
 #ifdef __ANDROID__
 #include <android/log.h>
 #define UVC_DEBUG(format, ...) __android_log_print(ANDROID_LOG_DEBUG, "libuvc", "[%s:%d/%s] " format "\n", basename(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__)
+#define UVC_ERROR(format, ...) __android_log_print(ANDROID_LOG_ERROR, "libuvc", "[%s:%d/%s] " format "\n", basename(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__)
 #define UVC_ENTER() __android_log_print(ANDROID_LOG_DEBUG, "libuvc", "[%s:%d] begin %s\n", basename(__FILE__), __LINE__, __FUNCTION__)
 #define UVC_EXIT(code) __android_log_print(ANDROID_LOG_DEBUG, "libuvc", "[%s:%d] end %s (%d)\n", basename(__FILE__), __LINE__, __FUNCTION__, code)
 #define UVC_EXIT_VOID() __android_log_print(ANDROID_LOG_DEBUG, "libuvc", "[%s:%d] end %s\n", basename(__FILE__), __LINE__, __FUNCTION__)
 #else
 #define UVC_DEBUG(format, ...) fprintf(stderr, "[%s:%d/%s] " format "\n", basename(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__)
+#define UVC_ERROR(format, ...) fprintf(stderr, "[%s:%d/%s] " format "\n", basename(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__)
 #define UVC_ENTER() fprintf(stderr, "[%s:%d] begin %s\n", basename(__FILE__), __LINE__, __FUNCTION__)
 #define UVC_EXIT(code) fprintf(stderr, "[%s:%d] end %s (%d)\n", basename(__FILE__), __LINE__, __FUNCTION__, code)
 #define UVC_EXIT_VOID() fprintf(stderr, "[%s:%d] end %s\n", basename(__FILE__), __LINE__, __FUNCTION__)
 #endif
 #else
 #define UVC_DEBUG(format, ...)
+#define UVC_ERROR(format, ...)
 #define UVC_ENTER()
 #define UVC_EXIT_VOID()
 #define UVC_EXIT(code)
@@ -223,11 +226,25 @@ typedef struct uvc_device_info {
   Default number of transfer buffers can be overwritten by defining
   this macro.
  */
-#ifndef LIBUVC_NUM_TRANSFER_BUFS
-#define LIBUVC_NUM_TRANSFER_BUFS 100
-#endif
+#define LIBUVC_NUM_TRANSFER_BUFS 5
+#define LIBUVC_NUM_FRAMEBUFFERS 3
 
-#define LIBUVC_XFER_META_BUF_SIZE ( 4 * 1024 )
+#define LIBUVC_XFER_META_BUF_SIZE (4 * 1024)
+
+struct uvc_framebuffer {
+    struct uvc_framebuffer *prev, *next;
+    uint32_t seq;
+    uint32_t pts;
+    uint32_t scr;
+    size_t got_bytes;
+    size_t buffer_size;
+    void *buffer;
+    size_t meta_got_bytes;
+    /* raw metadata buffer if available */
+    uint8_t *meta_buffer;
+
+    struct timespec capture_time_finished;
+};
 
 struct uvc_stream_handle {
   struct uvc_device_handle *devh;
@@ -238,30 +255,26 @@ struct uvc_stream_handle {
   uint8_t running;
   /** Current control block */
   struct uvc_stream_ctrl cur_ctrl;
+  enum uvc_frame_format frame_format;
 
   /* listeners may only access hold*, and only when holding a
    * lock on cb_mutex (probably signaled with cb_cond) */
   uint8_t fid;
-  uint32_t seq, hold_seq;
-  uint32_t pts, hold_pts;
-  uint32_t last_scr, hold_last_scr;
-  size_t got_bytes, hold_bytes;
-  uint8_t *outbuf, *holdbuf;
+  uint32_t seq;
   pthread_mutex_t cb_mutex;
   pthread_cond_t cb_cond;
   pthread_t cb_thread;
-  uint32_t last_polled_seq;
+
   uvc_frame_callback_t *user_cb;
   void *user_ptr;
-  struct libusb_transfer *transfers[LIBUVC_NUM_TRANSFER_BUFS];
-  uint8_t *transfer_bufs[LIBUVC_NUM_TRANSFER_BUFS];
-  struct uvc_frame frame;
-  enum uvc_frame_format frame_format;
-  struct timespec capture_time_finished;
 
-  /* raw metadata buffer if available */
-  uint8_t *meta_outbuf, *meta_holdbuf;
-  size_t meta_got_bytes, meta_hold_bytes;
+  struct libusb_transfer *transfers[LIBUVC_NUM_TRANSFER_BUFS];
+
+  struct uvc_framebuffer *backbuffers;
+  struct uvc_framebuffer *frontbuffers;
+  struct uvc_framebuffer *fb_front;
+  struct uvc_frame frame;
+
 };
 
 /** Handle on an open UVC device

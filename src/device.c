@@ -1923,11 +1923,7 @@ void LIBUSB_CALL _uvc_status_callback(struct libusb_transfer *transfer) {
     break;
   }
 
-#ifdef UVC_DEBUGGING
-  uvc_error_t ret =
-#endif
-      libusb_submit_transfer(transfer);
-  UVC_DEBUG("libusb_submit_transfer() = %d", ret);
+  libusb_submit_transfer(transfer);
 
   UVC_EXIT_VOID();
 }

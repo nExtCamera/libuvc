@@ -469,9 +469,6 @@ typedef struct uvc_frame {
   struct timeval capture_time;
   /** Estimate of system time when the device finished receiving the image */
   struct timespec capture_time_finished;
-  /** Handle on the device that produced the image.
-   * @warning You must not call any uvc_* functions during a callback. */
-  uvc_device_handle_t *source;
   /** Is the data buffer owned by the library?
    * If 1, the data buffer can be arbitrarily reallocated by frame conversion
    * functions.
@@ -652,6 +649,15 @@ uvc_error_t uvc_stream_get_frame(
     uvc_stream_handle_t *strmh,
     uvc_frame_t **frame,
     int32_t timeout_us
+);
+uvc_error_t uvc_stream_lock(
+    uvc_stream_handle_t *strmh,
+    uvc_frame_t **frame,
+    int32_t timeout_us
+);
+uvc_error_t uvc_stream_unlock(
+    uvc_stream_handle_t *strmh,
+    uvc_frame_t **frame
 );
 uvc_error_t uvc_stream_stop(uvc_stream_handle_t *strmh);
 void uvc_stream_close(uvc_stream_handle_t *strmh);
