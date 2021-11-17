@@ -817,6 +817,9 @@ uvc_error_t uvc_mjpeg2rgb(uvc_frame_t *in, uvc_frame_t *out);
 uvc_error_t uvc_mjpeg2gray(uvc_frame_t *in, uvc_frame_t *out);
 #endif
 
+void uvc_stream_set_max_packets_per_transfer(uvc_stream_handle_t *strmh, const size_t maxPpt);
+size_t uvc_stream_get_max_packets_per_transfer(uvc_stream_handle_t *strmh);
+
 #ifdef __cplusplus
 }
 #endif

@@ -867,10 +867,10 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
     if (!strmh->running) break;
     if (transfer->type != LIBUSB_TRANSFER_TYPE_ISOCHRONOUS) {
       /* This is a bulk mode transfer, so it just has one payload transfer */
-      _uvc_process_payload(strmh, transfer->buffer, transfer->actual_length);
+      _uvc_process_payload(strmh, transfer->buffer, (size_t) transfer->actual_length);
     } else {
       /* This is an isochronous mode transfer, so each packet has a payload transfer */
-      int packet_id;
+      u_int packet_id;
 
       for (packet_id = 0; packet_id < transfer->num_iso_packets; ++packet_id) {
         uint8_t *pktbuf;
@@ -930,16 +930,16 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
     } else {
       int i;
       /* Mark transfer as deleted. */
-      for (i = 0; i < LIBUVC_NUM_TRANSFER_BUFS; i++) {
-        if (strmh->transfers[i] == transfer) {
+      for(i=0; i < LIBUVC_NUM_TRANSFER_BUFS; ++i) {
+        if(strmh->transfers[i] == transfer) {
           UVC_DEBUG("Freeing orphan transfer %d (%p)", i, transfer);
           free_transfer(transfer);
           strmh->transfers[i] = NULL;
           break;
         }
       }
-      if (i == LIBUVC_NUM_TRANSFER_BUFS) {
-        UVC_DEBUG("orphan transfer %p not found; not freeing!", transfer);
+      if(i == LIBUVC_NUM_TRANSFER_BUFS ) {
+        UVC_ERROR("orphan transfer %p not found; not freeing!", transfer);
       }
     }
   }
@@ -1055,6 +1055,7 @@ uvc_error_t uvc_stream_open_ctrl(uvc_device_handle_t *devh, uvc_stream_handle_t 
   }
   strmh->devh = devh;
   strmh->stream_if = stream_if;
+  strmh->max_packets_per_transfer = 64;
 
   ret = uvc_claim_if(strmh->devh, strmh->stream_if->bInterfaceNumber);
   if (ret != UVC_SUCCESS)
@@ -1225,8 +1226,7 @@ uvc_error_t uvc_stream_start(
                                 endpoint_bytes_per_packet - 1) / endpoint_bytes_per_packet;
 
         /* But keep a reasonable limit: Otherwise we start dropping data */
-        if (packets_per_transfer > 32)
-          packets_per_transfer = 32;
+        if (packets_per_transfer > strmh->max_packets_per_transfer) packets_per_transfer = strmh->max_packets_per_transfer;
         
         total_transfer_size = packets_per_transfer * endpoint_bytes_per_packet;
         break;
@@ -1578,4 +1578,13 @@ void uvc_stream_close(uvc_stream_handle_t *strmh) {
 
   DL_DELETE(strmh->devh->streams, strmh);
   free(strmh);
+}
+
+void uvc_stream_set_max_packets_per_transfer(uvc_stream_handle_t *strmh, const size_t maxPpt) {
+    if (strmh)
+        strmh->max_packets_per_transfer = maxPpt;
+}
+
+size_t uvc_stream_get_max_packets_per_transfer(uvc_stream_handle_t *strmh) {
+    return strmh->max_packets_per_transfer;
 }

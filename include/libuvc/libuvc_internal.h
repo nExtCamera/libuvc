@@ -256,6 +256,7 @@ struct uvc_stream_handle {
   /** Current control block */
   struct uvc_stream_ctrl cur_ctrl;
   enum uvc_frame_format frame_format;
+  size_t max_packets_per_transfer;
 
   /* listeners may only access hold*, and only when holding a
    * lock on cb_mutex (probably signaled with cb_cond) */
