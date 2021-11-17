@@ -234,6 +234,7 @@ typedef struct uvc_device_info {
  */
 #define LIBUVC_NUM_TRANSFER_BUFS 5
 #define LIBUVC_NUM_FRAMEBUFFERS 3
+#define LIBUVC_MAX_TRANSFER_RETRY 10000
 
 #define LIBUVC_XFER_META_BUF_SIZE (4 * 1024)
 

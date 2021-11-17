@@ -883,13 +883,13 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
 
     if (resubmit && strmh->running) {
         int libusbRet;
-        int retry = 1000;
+        int retry = LIBUVC_MAX_TRANSFER_RETRY;
         do {
           libusbRet = libusb_submit_transfer(transfer);
         } while (libusbRet != LIBUSB_SUCCESS && --retry > 0);
         if (libusbRet != LIBUSB_SUCCESS) {
             int i;
-            UVC_ERROR("Resubmit transfer failed after %d retries (%p)", 1000-retry, transfer);
+            UVC_ERROR("Resubmit transfer failed after %d retries (%p)", LIBUVC_MAX_TRANSFER_RETRY-retry, transfer);
             pthread_mutex_lock(&strmh->cb_mutex);
 
             /* Mark transfer as deleted. */
