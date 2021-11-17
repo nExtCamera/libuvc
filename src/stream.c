@@ -835,8 +835,12 @@ void _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t p
   }
 
   if (data_len > 0) {
-    memcpy(back_fb->buffer + back_fb->got_bytes, payload + header_len, data_len);
-    back_fb->got_bytes += data_len;
+      if (back_fb->got_bytes + data_len > back_fb->buffer_size) {
+          UVC_DEBUG("buffer overflow: %zd > %zd", back_fb->got_bytes + data_len, back_fb->buffer_size);
+      } else {
+          memcpy(back_fb->buffer + back_fb->got_bytes, payload + header_len, data_len);
+          back_fb->got_bytes += data_len;
+      }
 
     if (header_info & UVC_STREAM_EOF) {
       /* The EOF bit is set, so publish the complete frame */
@@ -860,6 +864,7 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
 
   switch (transfer->status) {
   case LIBUSB_TRANSFER_COMPLETED:
+    if (!strmh->running) break;
     if (transfer->type != LIBUSB_TRANSFER_TYPE_ISOCHRONOUS) {
       /* This is a bulk mode transfer, so it just has one payload transfer */
       _uvc_process_payload(strmh, transfer->buffer, transfer->actual_length);
@@ -1242,6 +1247,8 @@ uvc_error_t uvc_stream_start(
       UVC_DEBUG("libusb_set_interface_alt_setting failed");
       goto fail;
     }
+
+  UVC_DEBUG("endpoint_bytes_per_packet=%zd, packets_per_transfer=%zd", endpoint_bytes_per_packet, packets_per_transfer);
 
   /* Set up the transfers */
   for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS; ++transfer_id) {
