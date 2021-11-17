@@ -1950,6 +1950,11 @@ void uvc_set_button_callback(uvc_device_handle_t *devh,
  * @param devh Device handle to an open UVC device
  */
 const uvc_format_desc_t *uvc_get_format_descs(uvc_device_handle_t *devh) {
-  return devh->info->stream_ifs->format_descs;
+  uvc_streaming_interface_t* stream_ifs = devh->info->stream_ifs;
+  if (stream_ifs != NULL) {
+    return stream_ifs->format_descs;
+  } else {
+    return NULL;
+  }
 }
 
