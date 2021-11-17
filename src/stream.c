@@ -382,6 +382,13 @@ static void free_transfer(struct libusb_transfer *transfer) {
     libusb_free_transfer(transfer);
 }
 
+static void free_transfer_safe(uvc_stream_handle_t *strmh, int idx) {
+    pthread_mutex_lock(&strmh->transfer_clean_mutex);
+    free_transfer(strmh->transfers[idx]);
+    strmh->transfers[idx] = NULL;
+    pthread_mutex_unlock(&strmh->transfer_clean_mutex);
+}
+
 /** @brief Reconfigure stream with a new stream format.
  * @ingroup streaming
  *
@@ -896,8 +903,7 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
             for (i = 0; i < LIBUVC_NUM_TRANSFER_BUFS; ++i) {
                 if (strmh->transfers[i] == transfer) {
                     UVC_DEBUG("Freeing failed transfer %d (%p)", i, transfer);
-                    free_transfer(transfer);
-                    strmh->transfers[i] = NULL;
+                    free_transfer_safe(strmh, i);
                     break;
                 }
             }
@@ -914,8 +920,7 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
         for (i = 0; i < LIBUVC_NUM_TRANSFER_BUFS; ++i) {
             if (strmh->transfers[i] == transfer) {
                 UVC_DEBUG("Freeing orphan transfer %d (%p)", i, transfer);
-                free_transfer(transfer);
-                strmh->transfers[i] = NULL;
+                free_transfer_safe(strmh, i);
                 break;
             }
         }
@@ -1076,6 +1081,7 @@ uvc_error_t uvc_stream_open_ctrl(uvc_device_handle_t *devh, uvc_stream_handle_t 
     goto fail;
   }
 
+  pthread_mutex_init(&strmh->transfer_clean_mutex, NULL);
   pthread_mutex_init(&strmh->cb_mutex, NULL);
   pthread_cond_init(&strmh->cb_cond, NULL);
 
@@ -1460,7 +1466,9 @@ uvc_error_t uvc_stream_stop(uvc_stream_handle_t *strmh) {
 
   for(i=0; i < LIBUVC_NUM_TRANSFER_BUFS; i++) {
     if(strmh->transfers[i] != NULL) {
-      libusb_cancel_transfer(strmh->transfers[i]);
+      pthread_mutex_lock(&strmh->transfer_clean_mutex);
+      if (strmh->transfers[i] != NULL) libusb_cancel_transfer(strmh->transfers[i]);
+      pthread_mutex_unlock(&strmh->transfer_clean_mutex);
     }
   }
 
@@ -1498,8 +1506,10 @@ void uvc_stream_close(uvc_stream_handle_t *strmh) {
   do {
     int i;
     for(i=0; i < LIBUVC_NUM_TRANSFER_BUFS; i++) {
-      if(strmh->transfers[i] != NULL)
-        break;
+      pthread_mutex_lock(&strmh->transfer_clean_mutex);
+      int exists = strmh->transfers[i] != NULL;
+      pthread_mutex_unlock(&strmh->transfer_clean_mutex);
+      if(exists) break;
     }
     if(i == LIBUVC_NUM_TRANSFER_BUFS )
       break;
@@ -1524,9 +1534,11 @@ void uvc_stream_close(uvc_stream_handle_t *strmh) {
 
   pthread_cond_destroy(&strmh->cb_cond);
   pthread_mutex_destroy(&strmh->cb_mutex);
+  pthread_mutex_destroy(&strmh->transfer_clean_mutex);
 
   DL_DELETE(strmh->devh->streams, strmh);
   free(strmh);
+  UVC_EXIT_VOID();
 }
 
 void uvc_stream_set_max_packets_per_transfer(uvc_stream_handle_t *strmh, const size_t maxPpt) {

@@ -267,6 +267,7 @@ struct uvc_stream_handle {
   uint32_t maxVideoFrameBufferSize;
 
   uint32_t seq;
+  pthread_mutex_t transfer_clean_mutex;
   pthread_mutex_t cb_mutex;
   pthread_cond_t cb_cond;
   pthread_t cb_thread;
