@@ -188,8 +188,11 @@ typedef struct uvc_streaming_interface {
   struct uvc_format_desc *format_descs;
   /** USB endpoint to use when communicating with this interface */
   uint8_t bEndpointAddress;
+  uint8_t bmInfo;
   uint8_t bTerminalLink;
   uint8_t bStillCaptureMethod;
+  uint8_t bTriggerSupport;
+  uint8_t bTriggerUsage;
 } uvc_streaming_interface_t;
 
 /** VideoControl interface */

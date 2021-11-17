@@ -934,6 +934,10 @@ const uvc_extension_unit_t *uvc_get_extension_units(uvc_device_handle_t *devh) {
   return devh->info->ctrl_if.extension_unit_descs;
 }
 
+const uvc_streaming_interface_t *uvc_get_streaming_interface(uvc_device_handle_t *devh) {
+  return devh->info->stream_ifs;
+}
+
 /**
  * @brief Increment the reference count for a device
  * @ingroup device
@@ -1346,8 +1350,11 @@ uvc_error_t uvc_parse_vs_input_header(uvc_streaming_interface_t *stream_if,
   UVC_ENTER();
 
   stream_if->bEndpointAddress = block[6] & 0x8f;
+  stream_if->bmInfo = block[7];
   stream_if->bTerminalLink = block[8];
   stream_if->bStillCaptureMethod = block[9];
+  stream_if->bTriggerSupport = block[10];
+  stream_if->bTriggerUsage = block[11];
 
   UVC_EXIT(UVC_SUCCESS);
   return UVC_SUCCESS;

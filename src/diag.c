@@ -191,8 +191,19 @@ void uvc_print_diag(uvc_device_handle_t *devh, FILE *stream) {
       ++stream_idx;
 
       fprintf(stream, "VideoStreaming(%d):\n"
-          "\tbEndpointAddress: %d\n\tFormats:\n",
-          stream_idx, stream_if->bEndpointAddress);
+          "\tbEndpointAddress: %d\n"
+          "\tbmInfo: 0x%08x\n"
+          "\tbStillCaptureMethod: %d\n"
+          "\tbTriggerSupport: %d\n"
+          "\tbTriggerUsage: %d\n"
+          "\tFormats:\n",
+          stream_idx,
+          stream_if->bEndpointAddress,
+          stream_if->bmInfo,
+          stream_if->bStillCaptureMethod,
+          stream_if->bTriggerSupport,
+          stream_if->bTriggerUsage
+          );
 
       DL_FOREACH(stream_if->format_descs, fmt_desc) {
         uvc_frame_desc_t *frame_desc;
@@ -280,12 +291,16 @@ void uvc_print_diag(uvc_device_handle_t *devh, FILE *stream) {
                     uvc_still_frame_res_t* imageSizePattern;
                     DL_FOREACH(still_frame_desc->imageSizePatterns, imageSizePattern) {
                         fprintf(stream,
-                            "\t\t\t  wWidth(%d) = %d\n"
-                            "\t\t\t  wHeight(%d) = %d\n",
+                            "\t\t\t  image size(%d): %d x %d\n",
                             imageSizePattern->bResolutionIndex,
                             imageSizePattern->wWidth,
-                            imageSizePattern->bResolutionIndex,
                             imageSizePattern->wHeight);
+                    }
+                    for (i = 0; i < still_frame_desc->bNumCompressionPattern; ++i) {
+                        fprintf(stream,
+                            "\t\t\t  bCompression[%d] = %d\n",
+                            i,
+                            still_frame_desc->bCompression[i]);
                     }
                 }
             }

@@ -690,6 +690,7 @@ const uvc_output_terminal_t *uvc_get_output_terminals(uvc_device_handle_t *devh)
 const uvc_selector_unit_t *uvc_get_selector_units(uvc_device_handle_t *devh);
 const uvc_processing_unit_t *uvc_get_processing_units(uvc_device_handle_t *devh);
 const uvc_extension_unit_t *uvc_get_extension_units(uvc_device_handle_t *devh);
+const struct uvc_streaming_interface *uvc_get_streaming_interface(uvc_device_handle_t *devh);
 
 uvc_error_t uvc_get_stream_ctrl_format_size(
     uvc_device_handle_t *devh,
