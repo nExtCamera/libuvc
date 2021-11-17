@@ -759,7 +759,7 @@ void _uvc_swap_buffers(uvc_stream_handle_t *strmh) {
  * transfer (bulk mode)
  * @param payload_len Length of the payload transfer
  */
-void _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t payload_len) {
+uvc_error_t _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t payload_len) {
   size_t header_len;
   uint8_t header_info;
   size_t data_len;
@@ -773,7 +773,7 @@ void _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t p
 
   /* ignore empty payload transfers */
   if (payload_len == 0)
-    return;
+    return UVC_SUCCESS;
 
   /* Certain iSight cameras have strange behavior: They send header
    * information in a packet with no image data, and then the following
@@ -794,8 +794,8 @@ void _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t p
 
     if (header_len > payload_len || header_len == 0) {
       UVC_DEBUG("bogus packet: actual_len=%zd, header_len=%zd\n", payload_len, header_len);
-        back_fb->status = UVC_FB_INVALID;
-      return;
+      back_fb->status = UVC_FB_INVALID;
+      return UVC_ERROR_IO;
     }
 
     if (strmh->devh->is_isight)
@@ -813,9 +813,9 @@ void _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t p
     header_info = payload[1];
 
     if (header_info & UVC_STREAM_ERR) {
-      UVC_DEBUG("bad packet: error bit set %zd", back_fb->got_bytes);
+      UVC_DEBUG("bad packet: error bit set buf_utilized=%f%%", 100.f * back_fb->got_bytes / back_fb->buffer_size);
       back_fb->status = UVC_FB_INVALID;
-      return;
+      return UVC_ERROR_IO;
     }
 
     if (strmh->fid != (header_info & UVC_STREAM_FID) && back_fb->got_bytes != 0) {
@@ -860,6 +860,7 @@ void _uvc_process_payload(uvc_stream_handle_t *strmh, uint8_t *payload, size_t p
     /* The EOF bit is set, so publish the complete frame */
     _uvc_swap_buffers(strmh);
   }
+  return UVC_SUCCESS;
 }
 
 /** @internal
@@ -885,6 +886,7 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
       /* This is an isochronous mode transfer, so each packet has a payload transfer */
       u_int packet_id;
 
+      int error_packets = 0;
       for (packet_id = 0; packet_id < transfer->num_iso_packets; ++packet_id) {
         uint8_t *pktbuf;
         struct libusb_iso_packet_descriptor *pkt;
@@ -897,10 +899,22 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
           continue;
         }
 
-        pktbuf = libusb_get_iso_packet_buffer_simple(transfer, packet_id);
+        pktbuf = libusb_get_iso_packet_buffer(transfer, packet_id);
 
-        _uvc_process_payload(strmh, pktbuf, pkt->actual_length);
+        uvc_error_t result = _uvc_process_payload(strmh, pktbuf, pkt->actual_length);
+        if (result != UVC_SUCCESS) {
+          ++error_packets;
+        }
       }
+#ifndef NDEBUG
+      if (error_packets > 0) {
+        int i = 0;
+        for (i = 0; i < LIBUVC_NUM_TRANSFER_BUFS; ++i) {
+          if (strmh->transfers[i] == transfer) break;
+        }
+        UVC_ERROR("Detected erroneous packets %d/%d in transfer %d", error_packets, transfer->num_iso_packets, i);
+      }
+#endif //NDEBUG
     }
     break;
   case LIBUSB_TRANSFER_CANCELLED: 
@@ -925,6 +939,7 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
         } while (libusbRet != LIBUSB_SUCCESS && --retry > 0);
         if (libusbRet != LIBUSB_SUCCESS) {
             int i;
+            UVC_ERROR("Resubmit transfer failed after %d retries (%p)", 1000-retry, transfer);
             pthread_mutex_lock(&strmh->cb_mutex);
 
             /* Mark transfer as deleted. */
@@ -1298,22 +1313,28 @@ uvc_error_t uvc_stream_start(
     pthread_create(&strmh->cb_thread, NULL, _uvc_user_caller, (void*) strmh);
   }
 
-  for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS; transfer_id++) {
+  for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS; ++transfer_id) {
     ret = libusb_submit_transfer(strmh->transfers[transfer_id]);
     if (ret != LIBUSB_SUCCESS) {
       UVC_ERROR("libusb_submit_transfer (%d) failed: %d", transfer_id, ret);
+      if (transfer_id >= 2) {
+          // require at least 2 transfers, so they can be used interchangeably
+          ret = UVC_SUCCESS;
+      }
       break;
     }
   }
 
-  if ( ret != LIBUSB_SUCCESS ) {
-    for (int i = transfer_id ; i < LIBUVC_NUM_TRANSFER_BUFS; i++) {
-      free_transfer(strmh->transfers[i]);
-      strmh->transfers[i] = NULL;
-    }
-    if (transfer_id > 1) // require more than 1 transfer, so they can be used interchangeably
-        ret = UVC_SUCCESS;
-    else goto fail;
+  // clear all other transfers
+  for (int i = transfer_id ; i < LIBUVC_NUM_TRANSFER_BUFS; ++i) {
+    free_transfer(strmh->transfers[i]);
+    strmh->transfers[i] = NULL;
+  }
+  if (ret != LIBUSB_SUCCESS) {
+      for (int i = 0; i < transfer_id; ++i) {
+          libusb_cancel_transfer(strmh->transfers[i]);
+      }
+      goto fail;
   }
 
   UVC_EXIT(ret);
