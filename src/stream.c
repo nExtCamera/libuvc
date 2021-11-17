@@ -1309,7 +1309,7 @@ uvc_error_t uvc_stream_start(
       free_transfer(strmh->transfers[i]);
       strmh->transfers[i] = NULL;
     }
-    if (transfer_id > 0)
+    if (transfer_id > 1) // require more than 1 transfer, so they can be used interchangeably
         ret = UVC_SUCCESS;
     else goto fail;
   }
