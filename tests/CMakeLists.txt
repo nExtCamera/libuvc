@@ -30,8 +30,8 @@ target_link_libraries(uvc_tests
 # copy test file
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/testorig.jpg
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/frame_50.jpg
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+#file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/frame_50.jpg
+#     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 # add tests to CTest
 include(doctest)

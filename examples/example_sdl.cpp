@@ -101,8 +101,7 @@ int main()
     uvc_print_diag(devh, stderr);
 
     uvc_stream_ctrl_t ctrl = {0,};
-    ret = uvc_get_stream_ctrl_format_size(
-        devh, &ctrl, UVC_FRAME_FORMAT_MJPEG, 640, 480, 30);
+    ret = uvc_get_stream_ctrl_format_size(devh, &ctrl, UVC_FRAME_FORMAT_MJPEG, TEX_WIDTH, TEX_HEIGHT, 30);
     if (UVC_SUCCESS != ret) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "uvc_get_stream_ctrl_format_size err %s", uvc_strerror(ret));
         return ret;
@@ -126,16 +125,7 @@ int main()
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "uvc_start_streaming err %s", uvc_strerror(ret));
         return ret;
     }
-
-    uvc_request_error_code_t rErrorCode;
-    uvc_stream_error_code_t errorCode;
-//    ret = uvc_get_stream_error_code(strmh, &errorCode);
-    if (UVC_SUCCESS != ret) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "uvc_get_stream_error_code err %s", uvc_strerror(ret));
-        return ret;
-    }
-//    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "uvc_get_stream_error_code errCode %d", errorCode);
-    
+   
     eventLoop();
 
     uvc_stop_streaming(devh);
@@ -176,9 +166,8 @@ void cb(uvc_frame_t *frame, void *ptr)
         rgb.capacity = pitch * TEX_HEIGHT;
         rgb.data_bytes = pitch * TEX_HEIGHT;
         auto ret = uvc_any2rgb(frame, &rgb);
-        if (ret)
-        {
-            uvc_perror(ret, "uvc_mjpeg2rgb");
+        if (ret) {
+            uvc_perror(ret, "uvc_any2rgb");
             SDL_UnlockTexture(texture);
             return;
         }

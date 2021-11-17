@@ -5,8 +5,6 @@ option(BUILD_EXAMPLE "Build example program" OFF)
 option(BUILD_EXAMPLE_SDL "Build SDL example program" ON)
 option(BUILD_EXAMPLE_OPENCV "Build OpenCV example program" OFF)
 
-find_package(SDL2 REQUIRED)
-include_directories(${SDL2_INCLUDE_DIRS})
 
 if(BUILD_EXAMPLE)
   add_executable(example example.c)
@@ -40,7 +38,7 @@ if(BUILD_EXAMPLE_SDL)
     find_package(SDL2 REQUIRED)
     include_directories(${SDL2_INCLUDE_DIRS})
 
-    add_executable(example_sdl test_camera.cpp)
+    add_executable(example_sdl example_sdl.cpp)
     target_compile_features(example_sdl PRIVATE cxx_std_17)
     target_link_libraries(example_sdl
         PRIVATE
