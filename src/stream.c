@@ -891,7 +891,7 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
 
         pkt = transfer->iso_packet_desc + packet_id;
 
-        if (pkt->status != 0) {
+        if (pkt->status != LIBUSB_TRANSFER_COMPLETED) {
           UVC_DEBUG("bad packet (isochronous transfer); pkt_id=%d status: %s(%d), actual_length=%d", packet_id, libusb_error_name(pkt->status), pkt->status, pkt->actual_length);
           strmh->backbuffers->status = UVC_FB_INVALID;
           continue;
@@ -906,57 +906,54 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
   case LIBUSB_TRANSFER_CANCELLED: 
   case LIBUSB_TRANSFER_ERROR:
   case LIBUSB_TRANSFER_NO_DEVICE: {
-    UVC_DEBUG("not retrying transfer, status = %d", transfer->status);
+    UVC_DEBUG("not retrying transfer, status = %s", libusb_error_name(transfer->status));
     resubmit = 0;
     break;
   }
   case LIBUSB_TRANSFER_TIMED_OUT:
   case LIBUSB_TRANSFER_STALL:
   case LIBUSB_TRANSFER_OVERFLOW:
-    UVC_DEBUG("retrying transfer, status = %d", transfer->status);
+    UVC_DEBUG("retrying transfer, status = %s", libusb_error_name(transfer->status));
     break;
   }
-  
-  if ( resubmit ) {
-    if (strmh->running) {
-      int libusbRet = libusb_submit_transfer(transfer);
-      if (libusbRet < 0) {
-        int i;
-        pthread_mutex_lock(&strmh->cb_mutex);
 
+    if (resubmit && strmh->running) {
+        int libusbRet = libusb_submit_transfer(transfer);
+        if (libusbRet < 0) {
+            int i;
+            pthread_mutex_lock(&strmh->cb_mutex);
+
+            /* Mark transfer as deleted. */
+            for (i = 0; i < LIBUVC_NUM_TRANSFER_BUFS; ++i) {
+                if (strmh->transfers[i] == transfer) {
+                    UVC_DEBUG("Freeing failed transfer %d (%p)", i, transfer);
+                    free_transfer(transfer);
+                    strmh->transfers[i] = NULL;
+                    break;
+                }
+            }
+            if (i == LIBUVC_NUM_TRANSFER_BUFS) {
+                UVC_DEBUG("failed transfer %p not found; not freeing!", transfer);
+            }
+
+            pthread_cond_broadcast(&strmh->cb_cond);
+            pthread_mutex_unlock(&strmh->cb_mutex);
+        }
+    } else {
+        int i;
         /* Mark transfer as deleted. */
-        for (i = 0; i < LIBUVC_NUM_TRANSFER_BUFS; i++) {
-          if (strmh->transfers[i] == transfer) {
-            UVC_DEBUG("Freeing failed transfer %d (%p)", i, transfer);
-            free(transfer->buffer);
-            libusb_free_transfer(transfer);
-            strmh->transfers[i] = NULL;
-            break;
-          }
+        for (i = 0; i < LIBUVC_NUM_TRANSFER_BUFS; ++i) {
+            if (strmh->transfers[i] == transfer) {
+                UVC_DEBUG("Freeing orphan transfer %d (%p)", i, transfer);
+                free_transfer(transfer);
+                strmh->transfers[i] = NULL;
+                break;
+            }
         }
         if (i == LIBUVC_NUM_TRANSFER_BUFS) {
-          UVC_DEBUG("failed transfer %p not found; not freeing!", transfer);
+            UVC_ERROR("orphan transfer %p not found; not freeing!", transfer);
         }
-
-        pthread_cond_broadcast(&strmh->cb_cond);
-        pthread_mutex_unlock(&strmh->cb_mutex);
-      }
-    } else {
-      int i;
-      /* Mark transfer as deleted. */
-      for(i=0; i < LIBUVC_NUM_TRANSFER_BUFS; ++i) {
-        if(strmh->transfers[i] == transfer) {
-          UVC_DEBUG("Freeing orphan transfer %d (%p)", i, transfer);
-          free_transfer(transfer);
-          strmh->transfers[i] = NULL;
-          break;
-        }
-      }
-      if(i == LIBUVC_NUM_TRANSFER_BUFS ) {
-        UVC_ERROR("orphan transfer %p not found; not freeing!", transfer);
-      }
     }
-  }
 }
 
 /** Begin streaming video from the camera into the callback function.
@@ -1517,6 +1514,7 @@ void uvc_stop_streaming(uvc_device_handle_t *devh) {
  * @param devh UVC device
  */
 uvc_error_t uvc_stream_stop(uvc_stream_handle_t *strmh) {
+  UVC_ENTER();
   int i;
 
   if (!strmh->running)
@@ -1526,24 +1524,10 @@ uvc_error_t uvc_stream_stop(uvc_stream_handle_t *strmh) {
 
   for(i=0; i < LIBUVC_NUM_TRANSFER_BUFS; i++) {
     if(strmh->transfers[i] != NULL) {
-      int res = libusb_cancel_transfer(strmh->transfers[i]);
-      if(res < 0 && res != LIBUSB_ERROR_NOT_FOUND ) {
-        free_transfer(strmh->transfers[i]);
-        strmh->transfers[i] = NULL;
-      }
+      libusb_cancel_transfer(strmh->transfers[i]);
     }
   }
 
-  /* Wait for transfers to complete/cancel */
-//  do {
-//    for(i=0; i < LIBUVC_NUM_TRANSFER_BUFS; i++) {
-//      if(strmh->transfers[i] != NULL)
-//        break;
-//    }
-//    if(i == LIBUVC_NUM_TRANSFER_BUFS )
-//      break;
-//    UVC_DEBUG("Waiting for transfers to complete: %d", i);
-//  } while(1);
   // Kick the user thread awake
   pthread_mutex_lock(&strmh->cb_mutex);
   pthread_cond_broadcast(&strmh->cb_cond);
@@ -1568,10 +1552,23 @@ uvc_error_t uvc_stream_stop(uvc_stream_handle_t *strmh) {
  * @param strmh UVC stream handle
  */
 void uvc_stream_close(uvc_stream_handle_t *strmh) {
+  UVC_ENTER();
   if (strmh->running)
     uvc_stream_stop(strmh);
 
   uvc_release_if(strmh->devh, strmh->stream_if->bInterfaceNumber);
+
+  /* Wait for transfers to complete/cancel */
+  do {
+    int i;
+    for(i=0; i < LIBUVC_NUM_TRANSFER_BUFS; i++) {
+      if(strmh->transfers[i] != NULL)
+        break;
+    }
+    if(i == LIBUVC_NUM_TRANSFER_BUFS )
+      break;
+    UVC_DEBUG("Waiting for transfers to complete: %d", i);
+  } while(1);
 
   struct uvc_framebuffer *fb, *tmp1;
   DL_FOREACH_SAFE(strmh->backbuffers, fb, tmp1) {
