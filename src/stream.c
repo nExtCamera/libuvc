@@ -713,10 +713,20 @@ uvc_error_t uvc_probe_still_ctrl(
  * @brief Swap the working buffer with the presented buffer and notify consumers
  */
 void _uvc_swap_buffers(uvc_stream_handle_t *strmh) {
+  struct uvc_framebuffer *current = strmh->backbuffers;
+  if (current->status == UVC_FB_INVALID || current->got_bytes == 0) {
+      // drop invalid frame, but increase sequence number so it can be tracked
+      current->status = UVC_FB_VALID;
+      current->seq = ++strmh->seq;
+      current->got_bytes = 0;
+      current->meta_got_bytes = 0;
+      current->scr = 0;
+      current->pts = 0;
+      return;
+  }
   pthread_mutex_lock(&strmh->cb_mutex);
 
   /* swap the buffers */
-  struct uvc_framebuffer *current = strmh->backbuffers;
   DL_DELETE(strmh->backbuffers, current);
   DL_APPEND(strmh->frontbuffers, current);
 
