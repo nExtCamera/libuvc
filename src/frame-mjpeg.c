@@ -126,6 +126,21 @@ static uvc_error_t uvc_mjpeg_convert(uvc_frame_t *in, uvc_frame_t *out) {
   struct jpeg_decompress_struct dinfo;
   struct error_mgr jerr;
   size_t lines_read;
+
+  if (in->frame_format != UVC_FRAME_FORMAT_MJPEG)
+    return UVC_ERROR_INVALID_PARAM;
+
+  if (uvc_ensure_frame_size(out, in->width * in->height * 3) < 0)
+    return UVC_ERROR_NO_MEM;
+
+  out->width = in->width;
+  out->height = in->height;
+  out->frame_format = UVC_FRAME_FORMAT_RGB;
+  out->step = in->width * 4;
+  out->sequence = in->sequence;
+  out->capture_time = in->capture_time;
+  out->capture_time_finished = in->capture_time_finished;
+
   dinfo.err = jpeg_std_error(&jerr.super);
   jerr.super.error_exit = _error_exit;
 
@@ -142,13 +157,7 @@ static uvc_error_t uvc_mjpeg_convert(uvc_frame_t *in, uvc_frame_t *out) {
     insert_huff_tables(&dinfo);
   }
 
-  if (out->frame_format == UVC_FRAME_FORMAT_RGB)
-    dinfo.out_color_space = JCS_RGB;
-  else if (out->frame_format == UVC_FRAME_FORMAT_GRAY8)
-    dinfo.out_color_space = JCS_GRAYSCALE;
-  else
-    goto fail;
-
+  dinfo.out_color_space = JCS_EXT_RGBA;
   dinfo.dct_method = JDCT_IFAST;
 
   jpeg_start_decompress(&dinfo);

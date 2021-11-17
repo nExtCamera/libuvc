@@ -62,17 +62,16 @@ uvc_error_t uvc_ensure_frame_size(uvc_frame_t *frame, size_t need_bytes) {
  * @return New frame, or NULL on error
  */
 uvc_frame_t *uvc_allocate_frame(size_t data_bytes) {
-  uvc_frame_t *frame = malloc(sizeof(*frame));
+  uvc_frame_t *frame = calloc(1, sizeof(uvc_frame_t));
 
   if (!frame)
     return NULL;
-
-  memset(frame, 0, sizeof(*frame));
 
   frame->library_owns_data = 1;
 
   if (data_bytes > 0) {
     frame->data_bytes = data_bytes;
+    frame->capacity = data_bytes;
     frame->data = malloc(data_bytes);
 
     if (!frame->data) {
@@ -118,7 +117,6 @@ uvc_error_t uvc_duplicate_frame(uvc_frame_t *in, uvc_frame_t *out) {
   out->width = in->width;
   out->height = in->height;
   out->frame_format = in->frame_format;
-  out->step = in->step;
   out->sequence = in->sequence;
   out->capture_time = in->capture_time;
   out->capture_time_finished = in->capture_time_finished;
@@ -180,7 +178,6 @@ uvc_error_t uvc_yuyv2rgb(uvc_frame_t *in, uvc_frame_t *out) {
   out->width = in->width;
   out->height = in->height;
   out->frame_format = UVC_FRAME_FORMAT_RGB;
-  out->step = in->width * 3;
   out->sequence = in->sequence;
   out->capture_time = in->capture_time;
   out->capture_time_finished = in->capture_time_finished;
@@ -230,7 +227,6 @@ uvc_error_t uvc_yuyv2bgr(uvc_frame_t *in, uvc_frame_t *out) {
   out->width = in->width;
   out->height = in->height;
   out->frame_format = UVC_FRAME_FORMAT_BGR;
-  out->step = in->width * 3;
   out->sequence = in->sequence;
   out->capture_time = in->capture_time;
   out->capture_time_finished = in->capture_time_finished;
@@ -269,7 +265,6 @@ uvc_error_t uvc_yuyv2y(uvc_frame_t *in, uvc_frame_t *out) {
   out->width = in->width;
   out->height = in->height;
   out->frame_format = UVC_FRAME_FORMAT_GRAY8;
-  out->step = in->width;
   out->sequence = in->sequence;
   out->capture_time = in->capture_time;
   out->capture_time_finished = in->capture_time_finished;
@@ -308,7 +303,6 @@ uvc_error_t uvc_yuyv2uv(uvc_frame_t *in, uvc_frame_t *out) {
   out->width = in->width;
   out->height = in->height;
   out->frame_format = UVC_FRAME_FORMAT_GRAY8;
-  out->step = in->width;
   out->sequence = in->sequence;
   out->capture_time = in->capture_time;
   out->capture_time_finished = in->capture_time_finished;
@@ -357,7 +351,6 @@ uvc_error_t uvc_uyvy2rgb(uvc_frame_t *in, uvc_frame_t *out) {
   out->width = in->width;
   out->height = in->height;
   out->frame_format = UVC_FRAME_FORMAT_RGB;
-  out->step = in->width *3;
   out->sequence = in->sequence;
   out->capture_time = in->capture_time;
   out->capture_time_finished = in->capture_time_finished;
@@ -406,7 +399,6 @@ uvc_error_t uvc_uyvy2bgr(uvc_frame_t *in, uvc_frame_t *out) {
   out->width = in->width;
   out->height = in->height;
   out->frame_format = UVC_FRAME_FORMAT_BGR;
-  out->step = in->width *3;
   out->sequence = in->sequence;
   out->capture_time = in->capture_time;
   out->capture_time_finished = in->capture_time_finished;

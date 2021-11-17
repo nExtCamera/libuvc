@@ -457,27 +457,27 @@ typedef struct uvc_frame {
   void *data;
   /** Size of image data buffer */
   size_t data_bytes;
+  /** Capacity of image data buffer */
+  size_t capacity;
   /** Width of image in pixels */
   uint32_t width;
   /** Height of image in pixels */
   uint32_t height;
   /** Pixel data format */
   enum uvc_frame_format frame_format;
-  /** Number of bytes per horizontal line (undefined for compressed format) */
-  size_t step;
   /** Frame number (may skip, but is strictly monotonically increasing) */
   uint32_t sequence;
   /** Estimate of system time when the device started capturing the image */
-  struct timeval capture_time;
+  struct timeval capture_time;  // todo to remove
   /** Estimate of system time when the device finished receiving the image */
-  struct timespec capture_time_finished;
+  struct timespec capture_time_finished; // todo to remove
   /** Is the data buffer owned by the library?
    * If 1, the data buffer can be arbitrarily reallocated by frame conversion
    * functions.
    * If 0, the data buffer will not be reallocated or freed by the library.
    * Set this field to zero if you are supplying the buffer.
    */
-  uint8_t library_owns_data;
+  uint8_t library_owns_data; // todo to remove
   /** Metadata for this frame if available */
   void *metadata;
   /** Size of metadata buffer */
@@ -488,6 +488,29 @@ typedef struct uvc_frame {
  * @ingroup streaming
  */
 typedef void(uvc_frame_callback_t)(struct uvc_frame *frame, void *user_ptr);
+
+typedef enum uvc_frame_state {
+    UVC_FRAME_VALID,
+    UVC_FRAME_INVALID
+} uvc_frame_state_t;
+
+typedef struct uvc_video_payload_context {
+  uvc_stream_handle_t *strmh;
+  uvc_frame_state_t frame_status;
+  uint8_t fid;
+  uint32_t pts;
+  uint32_t scr;
+} uvc_video_payload_context_t;
+
+typedef uvc_error_t(process_payload_t)(uvc_stream_handle_t *strmh, uvc_video_payload_context_t *payload_ctx, uint8_t *payload, size_t length);
+
+typedef struct uvc_video_handler {
+    uvc_video_payload_context_t* (*init)(uvc_stream_handle_t *strmh);
+    uvc_error_t (*release)(uvc_video_payload_context_t* pCtx);
+    process_payload_t *process_payload;
+    size_t (*get_frame_buffer_size)(uvc_video_payload_context_t* pCtx);
+} uvc_video_handler_t;
+
 
 /** Streaming mode, includes all information needed to select stream
  * @ingroup streaming
@@ -652,15 +675,6 @@ uvc_error_t uvc_stream_get_frame(
     uvc_frame_t **frame,
     int32_t timeout_us
 );
-uvc_error_t uvc_stream_lock(
-    uvc_stream_handle_t *strmh,
-    uvc_frame_t **frame,
-    int32_t timeout_us
-);
-uvc_error_t uvc_stream_unlock(
-    uvc_stream_handle_t *strmh,
-    uvc_frame_t **frame
-);
 uvc_error_t uvc_stream_stop(uvc_stream_handle_t *strmh);
 void uvc_stream_close(uvc_stream_handle_t *strmh);
 
@@ -821,6 +835,16 @@ uvc_error_t uvc_mjpeg2gray(uvc_frame_t *in, uvc_frame_t *out);
 
 void uvc_stream_set_max_packets_per_transfer(uvc_stream_handle_t *strmh, const size_t maxPpt);
 size_t uvc_stream_get_max_packets_per_transfer(uvc_stream_handle_t *strmh);
+
+uvc_error_t uvc_enqueue_frame(uvc_stream_handle_t *strmh, uvc_frame_t *frame);
+uvc_error_t uvc_dequeue_frame(uvc_stream_handle_t *strmh, uvc_frame_t** frame);
+uvc_frame_desc_t* uvc_stream_get_current_frame_desc(uvc_stream_handle_t *strmh);
+size_t uvc_stream_get_max_buffer_size(uvc_stream_handle_t *strmh);
+
+uvc_video_handler_t* uvc_get_video_handler(uvc_context_t *ctx, const uint8_t guid[16]);
+void uvc_register_video_handler(uvc_context_t *ctx, const uint8_t guid[16], uvc_video_handler_t *video_handler);
+
+void uvc_mjpeg_set_speed(uvc_stream_handle_t *strmh, int speed);
 
 #ifdef __cplusplus
 }

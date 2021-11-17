@@ -75,8 +75,50 @@ YUV stream from a UVC device such as a standard webcam.
  * @defgroup init Library initialization/deinitialization
  * @brief Setup routines used to construct UVC access contexts
  */
+#include <unistd.h>
 #include "libuvc/libuvc.h"
 #include "libuvc/libuvc_internal.h"
+
+#define HASH_ADD_GUID(head,add) HASH_ADD(hh,head,guid,16,add)
+#define HASH_FIND_GUID(head,findkey,out) HASH_FIND(hh,head,findkey,16,out)
+
+void uvc_register_video_handler(uvc_context_t *ctx, const uint8_t guid[16], uvc_video_handler_t *video_handler) {
+  struct uvc_video_payload_handler *vph = calloc(1, sizeof(*vph));
+  vph->video_handler = video_handler;
+  memcpy(vph->guid, guid, 16);
+  HASH_ADD_GUID(ctx->video_payload_handlers, vph);
+}
+
+uvc_video_handler_t* uvc_get_video_handler(uvc_context_t *ctx, const uint8_t guid[16]) {
+  struct uvc_video_payload_handler *vph = NULL;
+  HASH_FIND_GUID(ctx->video_payload_handlers, guid, vph);
+  if (vph == NULL) return NULL;
+  return vph->video_handler;
+}
+
+#define REGISTER(handler, ...) do { \
+    uint8_t GUID[16] = __VA_ARGS__; \
+    extern struct uvc_video_handler handler; \
+    uvc_register_video_handler(ctx, GUID, &handler); \
+  } while(0)
+
+static void _uvc_prefill_video_handlers(uvc_context_t *ctx) {
+  REGISTER(frame_vid_handler, {'Y',  'U',  'Y',  '2', 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71});
+  REGISTER(frame_vid_handler, {'U',  'Y',  'V',  'Y', 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71});
+  REGISTER(frame_vid_handler, {'Y',  '8',  '0',  '0', 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71});
+  REGISTER(frame_vid_handler, {'Y',  '1',  '6',  ' ', 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71});
+  REGISTER(frame_vid_handler, {'N',  'V',  '1',  '2', 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71});
+  REGISTER(frame_vid_handler, {'B',  'Y',  '8',  ' ', 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71});
+  REGISTER(frame_vid_handler, {'B',  'A',  '8',  '1', 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71});
+  REGISTER(frame_vid_handler, {'G',  'R',  'B',  'G', 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71});
+  REGISTER(frame_vid_handler, {'G',  'B',  'R',  'G', 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71});
+  REGISTER(frame_vid_handler, {'R',  'G',  'G',  'B', 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71});
+  REGISTER(frame_vid_handler, {'B',  'G',  'G',  'R', 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71});
+  #ifdef LIBUVC_HAS_JPEG
+  REGISTER(mjpeg_vid_handler, {'M','J','P','G',0,});
+  #endif
+}
+
 
 /** @internal
  * @brief Event handler thread
@@ -85,7 +127,7 @@ YUV stream from a UVC device such as a standard webcam.
  */
 void *_uvc_handle_events(void *arg) {
   uvc_context_t *ctx = (uvc_context_t *) arg;
-
+  nice(-10);
   while (!ctx->kill_handler_thread)
     libusb_handle_events_completed(ctx->usb_ctx, &ctx->kill_handler_thread);
   return NULL;
@@ -116,6 +158,8 @@ uvc_error_t uvc_init(uvc_context_t **pctx, struct libusb_context *usb_ctx) {
     ctx->own_usb_ctx = 0;
     ctx->usb_ctx = usb_ctx;
   }
+
+  _uvc_prefill_video_handlers(ctx);
 
   if (ctx != NULL)
     *pctx = ctx;

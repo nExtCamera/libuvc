@@ -21,9 +21,8 @@ if(NOT CMAKE_BUILD_TARGET)
     set(CMAKE_BUILD_TARGET "Both" CACHE STRING "" FORCE)
 endif()
 
-option(BUILD_EXAMPLE "Build example program" ON)
-option(BUILD_TEST "Build test program" OFF)
-option(ENABLE_UVC_DEBUGGING "Enable UVC debugging" OFF)
+option(ENABLE_UVC_DEBUGGING "Enable UVC debugging" ON)
+
 
 set(libuvc_DESCRIPTION "A cross-platform library for USB video devices")
 set(libuvc_URL "https://github.com/libuvc/libuvc")
@@ -37,16 +36,18 @@ set(SOURCES
   src/init.c
   src/stream.c
   src/misc.c
+  src/fbuffer.c
+  src/video_payload_frame_based.c
 )
 
 find_package(LibUSB)
 
 # JpegPkg name to differ from shipped with CMake
-find_package(JpegPkg QUIET)
+find_package(JpegPkg)
 if(JPEG_FOUND)
   message(STATUS "Building libuvc with JPEG support.")
   set(LIBUVC_HAS_JPEG TRUE)
-  list(APPEND SOURCES src/frame-mjpeg.c)
+  list(APPEND SOURCES src/video_payload_mjpeg.c)
 else()
   message(WARNING "JPEG not found. libuvc will not support JPEG decoding.")
 endif()
@@ -127,35 +128,6 @@ foreach(target_name IN LISTS UVC_TARGETS)
   endif()
 endforeach()
 
-if(BUILD_EXAMPLE)
-  add_executable(example src/example.c)
-  find_package(Threads)
-  target_link_libraries(example
-    PRIVATE
-      LibUVC::UVC
-      Threads::Threads
-  )
-endif()
-
-if(BUILD_TEST)
-  # OpenCV defines targets with transitive dependencies not with namespaces but using opencv_ prefix. 
-  # This targets provide necessary include directories and linked flags.
-  find_package(OpenCVPkg REQUIRED
-    COMPONENTS
-      opencv_core
-      opencv_highgui
-  )
-
-  add_executable(uvc_test src/test.c)
-  target_link_libraries(uvc_test
-    PRIVATE
-      LibUVC::UVC
-      opencv_core
-      opencv_highgui
-  )
-endif()
-
-
 include(GNUInstallDirs)
 set(CMAKE_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/libuvc)
 
@@ -211,4 +183,13 @@ install(FILES libuvcConfig.cmake
   DESTINATION ${CMAKE_INSTALL_CMAKEDIR}
 )
 
+add_subdirectory(examples)
+
+enable_testing()
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    include(CTest)
+endif()
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 

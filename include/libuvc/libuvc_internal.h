@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <libusb.h>
 #include "utlist.h"
+#include "uthash.h"
 
 /** Converts an unaligned four-byte little-endian integer into an int32 */
 #define DW_TO_INT(p) ((p)[0] | ((p)[1] << 8) | ((p)[2] << 16) | ((p)[3] << 24))
@@ -70,6 +71,11 @@
 #define UVC_ENTER()
 #define UVC_EXIT_VOID()
 #define UVC_EXIT(code)
+#endif
+#ifdef UVC_VLOG
+    #define UVC_VERBOSE(...) UVC_DEBUG(__VA_ARGS__)
+#else
+    #define UVC_VERBOSE(...)
 #endif
 
 /* http://stackoverflow.com/questions/19452971/array-size-macro-that-rejects-pointers */
@@ -231,20 +237,11 @@ typedef struct uvc_device_info {
 
 #define LIBUVC_XFER_META_BUF_SIZE (4 * 1024)
 
-enum uvc_fb_state {
-    UVC_FB_VALID,
-    UVC_FB_INVALID
-};
 
 struct uvc_framebuffer {
     struct uvc_framebuffer *prev, *next;
-    enum uvc_fb_state status;
-    uint32_t seq;
-    uint32_t pts;
-    uint32_t scr;
-    size_t got_bytes;
-    size_t buffer_size;
-    void *buffer;
+    uvc_frame_state_t status;
+    uvc_frame_t *frame;
     size_t meta_got_bytes;
     /* raw metadata buffer if available */
     uint8_t *meta_buffer;
@@ -264,9 +261,10 @@ struct uvc_stream_handle {
   enum uvc_frame_format frame_format;
   size_t max_packets_per_transfer;
 
-  /* listeners may only access hold*, and only when holding a
-   * lock on cb_mutex (probably signaled with cb_cond) */
-  uint8_t fid;
+  uint16_t width;
+  uint16_t height;
+  uint32_t maxVideoFrameBufferSize;
+
   uint32_t seq;
   pthread_mutex_t cb_mutex;
   pthread_cond_t cb_cond;
@@ -275,12 +273,13 @@ struct uvc_stream_handle {
   uvc_frame_callback_t *user_cb;
   void *user_ptr;
 
+  uvc_video_handler_t *videoHandler;
+  uvc_video_payload_context_t* payload_ctx;
+
   struct libusb_transfer *transfers[LIBUVC_NUM_TRANSFER_BUFS];
 
   struct uvc_framebuffer *backbuffers;
   struct uvc_framebuffer *frontbuffers;
-  struct uvc_framebuffer *fb_front;
-  struct uvc_frame frame;
 };
 
 /** Handle on an open UVC device
@@ -307,6 +306,12 @@ struct uvc_device_handle {
   uint8_t is_isight;
 };
 
+struct uvc_video_payload_handler {
+  uint8_t guid[16];
+  uvc_video_handler_t *video_handler;
+  UT_hash_handle hh; /* makes this structure hashable */
+};
+
 /** Context within which we communicate with devices */
 struct uvc_context {
   /** Underlying context for USB communication */
@@ -317,6 +322,8 @@ struct uvc_context {
   uvc_device_handle_t *open_devices;
   pthread_t handler_thread;
   int kill_handler_thread;
+  /***/
+  struct uvc_video_payload_handler* video_payload_handlers;
 };
 
 uvc_error_t uvc_query_stream_ctrl(
@@ -328,6 +335,9 @@ uvc_error_t uvc_query_stream_ctrl(
 void uvc_start_handler_thread(uvc_context_t *ctx);
 uvc_error_t uvc_claim_if(uvc_device_handle_t *devh, int idx);
 uvc_error_t uvc_release_if(uvc_device_handle_t *devh, int idx);
+
+void _uvc_swap_buffers(uvc_stream_handle_t *strmh);
+
 
 #endif // !def(LIBUVC_INTERNAL_H)
 /** @endcond */
