@@ -1951,7 +1951,14 @@ void LIBUSB_CALL _uvc_status_callback(struct libusb_transfer *transfer) {
     break;
   }
 
-  libusb_submit_transfer(transfer);
+  int ret = libusb_submit_transfer(transfer);
+  if (ret != LIBUSB_SUCCESS) {
+      pthread_mutex_lock(&devh->status_clean_mutex);
+      libusb_free_transfer(transfer);
+      devh->status_xfer = NULL;
+      pthread_cond_signal(&devh->status_clean_condition);
+      pthread_mutex_unlock(&devh->status_clean_mutex);
+  }
 
   UVC_EXIT_VOID();
 }
