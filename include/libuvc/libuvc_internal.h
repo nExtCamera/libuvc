@@ -236,7 +236,7 @@ typedef struct uvc_device_info {
   Default number of transfer buffers can be overwritten by defining
   this macro.
  */
-#define LIBUVC_NUM_TRANSFER_BUFS 100
+#define LIBUVC_NUM_TRANSFER_BUFS 400
 #define LIBUVC_NUM_FRAMEBUFFERS 3
 #define LIBUVC_MAX_TRANSFER_RETRY 10000
 
