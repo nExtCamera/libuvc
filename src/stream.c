@@ -67,6 +67,8 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
 }
 #endif // _MSC_VER
 
+#define DIVIDE_CEIL(a,b) (((a) + (b) - 1) / (b))
+
 static const int REQ_TYPE_SET = 0x21;
 static const int REQ_TYPE_GET = 0xa1;
 
@@ -1173,6 +1175,7 @@ uvc_error_t uvc_stream_start(
   const struct libusb_interface *interface;
   int interface_id;
   char isochronous;
+  char has_alt_setting = 0; // boolean
 
   uvc_stream_ctrl_t *ctrl;
   uvc_error_t ret;
@@ -1278,6 +1281,7 @@ uvc_error_t uvc_stream_start(
       UVC_DEBUG("libusb_set_interface_alt_setting failed");
       goto fail;
     }
+    has_alt_setting = 1;
 
   UVC_DEBUG("endpoint_bytes_per_packet=%zd, packets_per_transfer=%zd", endpoint_bytes_per_packet, packets_per_transfer);
 
@@ -1358,6 +1362,9 @@ uvc_error_t uvc_stream_start(
   return ret;
 fail:
   strmh->running = 0;
+  if (has_alt_setting) {
+      libusb_set_interface_alt_setting(strmh->devh->usb_devh, interface_id, 0);
+  }
   UVC_EXIT(ret);
   return ret;
 }
