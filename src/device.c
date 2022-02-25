@@ -1715,17 +1715,6 @@ void uvc_free_devh(uvc_device_handle_t *devh) {
   if (devh->info)
     uvc_free_device_info(devh->info);
 
-  if (devh->status_xfer) {
-      pthread_mutex_lock(&devh->status_clean_mutex);
-      if (devh->status_xfer) {
-          libusb_cancel_transfer(devh->status_xfer);
-          pthread_cond_wait(&devh->status_clean_condition, &devh->status_clean_mutex);
-      }
-      pthread_mutex_unlock(&devh->status_clean_mutex);
-      pthread_cond_destroy(&devh->status_clean_condition);
-      pthread_mutex_destroy(&devh->status_clean_mutex);
-  }
-
   free(devh);
 
   UVC_EXIT_VOID();
@@ -1749,6 +1738,17 @@ void uvc_close(uvc_device_handle_t *devh) {
   uvc_release_if(devh, devh->info->ctrl_if.bInterfaceNumber);
 
   libusb_set_auto_detach_kernel_driver(devh->usb_devh, 0);
+
+    if (devh->status_xfer) {
+        pthread_mutex_lock(&devh->status_clean_mutex);
+        if (devh->status_xfer) {
+            libusb_cancel_transfer(devh->status_xfer);
+            pthread_cond_wait(&devh->status_clean_condition, &devh->status_clean_mutex);
+        }
+        pthread_mutex_unlock(&devh->status_clean_mutex);
+        pthread_cond_destroy(&devh->status_clean_condition);
+        pthread_mutex_destroy(&devh->status_clean_mutex);
+    }
 
   /* If we are managing the libusb context and this is the last open device,
    * then we need to cancel the handler thread. When we call libusb_close,
