@@ -897,7 +897,13 @@ void LIBUSB_CALL _uvc_stream_callback(struct libusb_transfer *transfer) {
     if (!strmh->running) break;
     if (transfer->type != LIBUSB_TRANSFER_TYPE_ISOCHRONOUS) {
       /* This is a bulk mode transfer, so it just has one payload transfer */
-      _uvc_process_payload(strmh, transfer->buffer, (size_t) transfer->actual_length);
+      uint32_t dwMaxPayloadTransferSize = strmh->cur_ctrl.dwMaxPayloadTransferSize;
+      uint32_t offset = 0;
+        while (offset < transfer->actual_length) {
+            uint32_t packet_size = (offset + dwMaxPayloadTransferSize) > transfer->actual_length ? transfer->actual_length - offset : dwMaxPayloadTransferSize;
+            _uvc_process_payload(strmh, transfer->buffer + offset, packet_size);
+            offset += dwMaxPayloadTransferSize;
+        }
     } else {
       /* This is an isochronous mode transfer, so each packet has a payload transfer */
       unsigned int packet_id;
@@ -1302,18 +1308,19 @@ uvc_error_t uvc_stream_start(
       strmh->transfers[transfer_id] = transfer;
     }
   } else { // bulk transfer
-    for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS; ++transfer_id) {
+    uint32_t bulk_buffer_size = strmh->cur_ctrl.dwMaxPayloadTransferSize * DIVIDE_CEIL(strmh->cur_ctrl.dwMaxVideoFrameSize, strmh->cur_ctrl.dwMaxPayloadTransferSize);
+    for (transfer_id = 0; transfer_id < 3; ++transfer_id) {
       transfer = libusb_alloc_transfer(0);
       if (transfer == NULL) break;
-      uint8_t *buffer = malloc(strmh->cur_ctrl.dwMaxPayloadTransferSize);
+      uint8_t *buffer = malloc(bulk_buffer_size);
       if (buffer == NULL) {
           libusb_free_transfer(transfer);
           break;
       }
-      libusb_fill_bulk_transfer( transfer, strmh->devh->usb_devh,
-          strmh->stream_if->bEndpointAddress,
-          buffer, strmh->cur_ctrl.dwMaxPayloadTransferSize, _uvc_stream_callback,
-          ( void* ) strmh, 5000 );
+      libusb_fill_bulk_transfer(transfer, strmh->devh->usb_devh,
+                                strmh->stream_if->bEndpointAddress,
+                                buffer, bulk_buffer_size, _uvc_stream_callback,
+                                ( void* ) strmh, 5000 );
       strmh->transfers[transfer_id] = transfer;
     }
   }
