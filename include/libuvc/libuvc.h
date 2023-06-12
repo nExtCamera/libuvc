@@ -949,6 +949,8 @@ void uvc_register_video_handler(uvc_context_t *ctx, const uint8_t guid[16], uvc_
 
 void uvc_mjpeg_set_speed(uvc_stream_handle_t *strmh, int speed);
 
+uint uvc_get_packet_sizes(uvc_stream_handle_t *strmh, uint *data, uint size);
+
 #ifdef __cplusplus
 }
 #endif

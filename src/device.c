@@ -2009,3 +2009,17 @@ const uvc_format_desc_t *uvc_get_format_descs(uvc_device_handle_t *devh) {
   }
 }
 
+uint uvc_get_packet_sizes(uvc_stream_handle_t *strmh, uint *data, uint size) {
+  const int interface_id = strmh->stream_if->bInterfaceNumber;
+  const struct libusb_interface* interface = &strmh->devh->info->config->interface[interface_id];
+
+  if (data == NULL || size != interface->num_altsetting) {
+    return interface->num_altsetting;
+  }
+  for (int alt_idx = 0; alt_idx < size; ++alt_idx) {
+    int result = libusb_get_max_alt_packet_size(strmh->devh->dev->usb_dev, interface_id, alt_idx, strmh->stream_if->bEndpointAddress);
+    data[alt_idx] = result < 0 ? 0 : result;
+  }
+
+  return interface->num_altsetting;
+}
