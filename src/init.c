@@ -214,6 +214,7 @@ void uvc_start_handler_thread(uvc_context_t *ctx) {
   if (ctx->own_usb_ctx) {
     ctx->kill_handler_thread = 0;
     pthread_create(&ctx->handler_thread, NULL, uvc_handle_events, (void *) ctx);
+    pthread_setname_np(ctx->handler_thread, "UVC Thread");
   }
 }
 
