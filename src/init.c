@@ -128,7 +128,7 @@ static void _uvc_prefill_video_handlers(uvc_context_t *ctx) {
 static void *uvc_handle_events(void *arg) {
   uvc_context_t *ctx = (uvc_context_t *) arg;
   uvc_error_t err;
-  nice(-10);
+  nice(UVC_THREAD_NICE);
   while (!ctx->kill_handler_thread) {
     err = libusb_handle_events_completed(ctx->usb_ctx, &ctx->kill_handler_thread);
     if (err != LIBUSB_SUCCESS) {
