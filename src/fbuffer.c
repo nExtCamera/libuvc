@@ -15,7 +15,12 @@ uvc_error_t uvc_enqueue_frame(uvc_stream_handle_t *strmh, uvc_frame_t *frame) {
     fb->frame = frame;
     fb->meta_buffer = malloc( LIBUVC_XFER_META_BUF_SIZE );
     pthread_mutex_lock(&strmh->cb_mutex);
-    DL_APPEND(strmh->backbuffers, fb);
+    if (frame->isStillImage) {
+        UVC_DEBUG("Append stillbuffer..");
+        DL_APPEND(strmh->stillbuffers, fb);
+    } else {
+        DL_APPEND(strmh->backbuffers, fb);
+    }
     pthread_mutex_unlock(&strmh->cb_mutex);
     return UVC_SUCCESS;
 }

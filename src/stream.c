@@ -378,8 +378,8 @@ uvc_error_t uvc_trigger_still(
     uvc_still_ctrl_t *still_ctrl) {
   uvc_stream_handle_t* stream;
   uvc_streaming_interface_t* stream_if;
-  uint8_t buf;
   uvc_error_t err;
+  uint8_t buf = 1; /* prepare for a SET transfer */
   UVC_ENTER();
 
   /* Stream must be running for method 2 to work */
@@ -392,8 +392,14 @@ uvc_error_t uvc_trigger_still(
   if(!stream_if || stream_if->bStillCaptureMethod != 2)
       return UVC_ERROR_NOT_SUPPORTED;
 
-  /* prepare for a SET transfer */
-  buf = 1;
+  const uvc_still_frame_res_t* still_frame_res = uvc_get_still_frame_res(devh, still_ctrl);
+
+  uvc_frame_t* frame = uvc_allocate_frame(still_ctrl->dwMaxVideoFrameSize);
+  frame->isStillImage = 1;
+  frame->width = still_frame_res->wWidth;
+  frame->height = still_frame_res->wHeight;
+
+  uvc_enqueue_frame(stream, frame);
 
   /* do the transfer */
   err = libusb_control_transfer(

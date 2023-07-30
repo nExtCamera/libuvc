@@ -285,6 +285,7 @@ struct uvc_stream_handle {
   struct libusb_transfer *transfers[LIBUVC_NUM_TRANSFER_BUFS];
 
   struct uvc_framebuffer *backbuffers;
+  struct uvc_framebuffer *stillbuffers;
   struct uvc_framebuffer *frontbuffers;
 };
 
@@ -356,6 +357,8 @@ uvc_error_t uvc_get_request_error_code(uvc_device_handle_t *devh, enum uvc_reque
 uvc_error_t uvc_get_stream_error_code(uvc_stream_handle_t *strmh, enum uvc_stream_error_code *error_code);
 
 void uvc_enqueue_job(uvc_context_t *ctx, uvc_job_func_t* func, void *user_ptr);
+
+const uvc_still_frame_res_t* uvc_get_still_frame_res(uvc_device_handle_t *devh, uvc_still_ctrl_t *still_ctrl);
 
 #endif // !def(LIBUVC_INTERNAL_H)
 /** @endcond */

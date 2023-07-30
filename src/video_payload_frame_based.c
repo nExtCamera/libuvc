@@ -17,8 +17,10 @@ static void finalize_frame(uvc_stream_handle_t *strmh) {
     struct uvc_framebuffer* back_fb = strmh->backbuffers;
     uvc_frame_t* frame = back_fb->frame;
     frame->frame_format = strmh->frame_format;
-    frame->width = strmh->width;
-    frame->height = strmh->height;
+    if (!frame->isStillImage) {
+        frame->width = strmh->width;
+        frame->height = strmh->height;
+    }
     _uvc_swap_buffers(strmh);
 }
 
@@ -41,10 +43,18 @@ static uvc_error_t process_payload_frame_based(uvc_stream_handle_t *strmh, uvc_v
             finalize_frame(strmh);
         }
         pctx->frame_status = UVC_FRAME_VALID;
+        pctx->still_image = (header_info & UVC_STREAM_STI) != 0;
+        if (pctx->still_image && strmh->stillbuffers) {
+            UVC_DEBUG("Prepend frame from stillbuffer..");
+            struct uvc_framebuffer* elem = strmh->stillbuffers;
+            DL_DELETE(strmh->stillbuffers, elem);
+            DL_PREPEND(strmh->backbuffers, elem);
+        }
         back_fb = strmh->backbuffers;
     }
 
     pctx->fid = (uint8_t) (header_info & UVC_STREAM_FID);
+
     if (!back_fb) {
         return UVC_ERROR_NOT_FOUND;
     }

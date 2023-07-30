@@ -2023,3 +2023,18 @@ uint uvc_get_packet_sizes(uvc_stream_handle_t *strmh, uint *data, uint size) {
 
   return interface->num_altsetting;
 }
+
+const uvc_still_frame_res_t* uvc_get_still_frame_res(uvc_device_handle_t *devh, uvc_still_ctrl_t *still_ctrl) {
+
+  const uvc_streaming_interface_t* stream_if;
+  DL_SEARCH_SCALAR(devh->info->stream_ifs, stream_if, bInterfaceNumber, still_ctrl->bInterfaceNumber);
+
+  const uvc_format_desc_t *format;
+  DL_SEARCH_SCALAR(stream_if->format_descs, format, bFormatIndex, still_ctrl->bFormatIndex);
+
+  const uvc_still_frame_res_t *still_res;
+  DL_SEARCH_SCALAR(format->still_frame_desc->imageSizePatterns, still_res, bResolutionIndex, still_ctrl->bFrameIndex);
+
+  return still_res;
+}
+

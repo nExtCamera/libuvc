@@ -596,6 +596,7 @@ typedef struct uvc_video_payload_context {
   uvc_stream_handle_t *strmh;
   uvc_frame_state_t frame_status;
   uint8_t fid;
+  uint8_t still_image;
   uint32_t pts;
   uint32_t scr;
 } uvc_video_payload_context_t;
