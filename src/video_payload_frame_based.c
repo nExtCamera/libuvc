@@ -33,8 +33,15 @@ static uvc_error_t process_payload_frame_based(uvc_stream_handle_t *strmh, uvc_v
     header_len = payload[0];
     header_info = payload[1];
     data_len = length - header_len;
+    uint hdr_fid = (header_info & UVC_STREAM_FID);
+    uint8_t hdr_still_image = (header_info & UVC_STREAM_STI) != 0;
 
-    if (pctx->fid != (header_info & UVC_STREAM_FID)) {
+    // hackfix for devices that do not update FID when a still image is received
+    if (pctx->still_image != hdr_still_image && pctx->fid == hdr_fid) {
+        pctx->fid = !pctx->fid;
+    }
+
+    if (pctx->fid != hdr_fid) {
         /* The frame ID bit was flipped, but we have image data sitting
            around from prior transfers. This means the camera didn't send
            an EOF for the last transfer of the previous frame. */
@@ -43,17 +50,19 @@ static uvc_error_t process_payload_frame_based(uvc_stream_handle_t *strmh, uvc_v
             finalize_frame(strmh);
         }
         pctx->frame_status = UVC_FRAME_VALID;
-        pctx->still_image = (header_info & UVC_STREAM_STI) != 0;
+        pctx->still_image = hdr_still_image;
         if (pctx->still_image && strmh->stillbuffers) {
             UVC_DEBUG("Prepend frame from stillbuffer..");
+            pthread_mutex_lock(&strmh->cb_mutex);
             struct uvc_framebuffer* elem = strmh->stillbuffers;
             DL_DELETE(strmh->stillbuffers, elem);
             DL_PREPEND(strmh->backbuffers, elem);
+            pthread_mutex_unlock(&strmh->cb_mutex);
         }
         back_fb = strmh->backbuffers;
     }
 
-    pctx->fid = (uint8_t) (header_info & UVC_STREAM_FID);
+    pctx->fid = hdr_fid;
 
     if (!back_fb) {
         return UVC_ERROR_NOT_FOUND;
