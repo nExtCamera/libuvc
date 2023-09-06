@@ -780,7 +780,9 @@ void _uvc_swap_buffers(uvc_stream_handle_t *strmh) {
       current->status = UVC_FRAME_VALID;
       current->frame->data_bytes = 0;
       current->meta_got_bytes = 0;
-      return;
+      if (!current->frame->isStillImage) {
+          return; // only abort standard frames, and let pass stills so the host can react to an invalid still frame
+      }
   }
   (void)clock_gettime(CLOCK_BOOTTIME, &current->capture_time_finished);
 
